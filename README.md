@@ -15,12 +15,11 @@ An institutional-grade, multi-asset wealth management and algorithmic execution 
 
 ```mermaid
 flowchart TD
-    A[🏛️ Autonomous Wealth Engine] --> B[⚡ Intraday Algo Engine]
-    A --> C[🎯 Dynamic Goal Engine]
-    A --> D[💼 Live Demat Watchdog]
-    A --> E[🏛️ 50-Year Moat Vault]
-    A --> F[🌙 100% Halal Wealth]
-### 1. ⚡ Institutional Intraday Algo Engine
+    A["🏛️ Autonomous Wealth Engine"] --> B["⚡ Intraday Algo Engine"]
+    A --> C["🎯 Dynamic Goal Engine"]
+    A --> D["💼 Live Demat Watchdog"]
+    A --> E["🏛️ 50-Year Moat Vault"]
+    A --> F["🌙 100% Halal Wealth"]
 * **Nifty Trend Guard:** Validates market directional alignment before initiating individual equity long positions.
 * **Volume Surge & VWAP Filters:** Eliminates false breakouts and market noise.
 * **Dynamic ATR Stop-Loss & Target:** Volatility-adjusted 1:2 risk-to-reward parameters.
