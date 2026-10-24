@@ -84,6 +84,7 @@ pip install -r requirements.txt
 
 # 3. Launch the platform
 streamlit run app.py
+```
 The application will open automatically in your browser at http://localhost:8501.
 🔒 Security & Privacy Architecture
 Zero Credential Persistence: API Keys, Access Tokens, and personal client data are never committed to this repository.
