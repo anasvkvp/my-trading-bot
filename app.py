@@ -67,7 +67,7 @@ main_menu = st.sidebar.radio(
     "നിങ്ങൾക്ക് ആവശ്യമുള്ള വിഭാഗം തിരഞ്ഞെടുക്കുക:",
     [
         "⚡ ഇൻട്രാഡേ ട്രേഡിംഗ് ബോട്ട്",
-        "🏛️ 50-Year Veteran ഇന്ത്യൻ നിക്ഷേപം",
+        "🏛️ 50-Year Veteran ദീർഘകാല നിക്ഷേപം (1Y, 5Y, 10Y)",
         "📈 മികച്ച മ്യൂച്വൽ ഫണ്ടുകൾ (SIP)",
         "🌍 ആഗോള നിക്ഷേപം (US & Global Markets)",
         "🥇 ഗോൾഡ്, സിൽവർ & റിയൽ എസ്റ്റേറ്റ് (REITs)",
@@ -297,31 +297,101 @@ if main_menu == "⚡ ഇൻട്രാഡേ ട്രേഡിംഗ് ബോ
         except Exception: st.info("ട്രേഡുകൾ ഒന്നും നടന്നിട്ടില്ല.")
 
 # ##################################################################
-# 🏛️ വിഭാഗം 2: 50-Year Veteran ഇന്ത്യൻ നിക്ഷേപം
+# 🏛️ വിഭാഗം 2: 50-Year Veteran ദീർഘകാല നിക്ഷേപം (1Y, 5Y, 10Y Screener)
 # ##################################################################
-elif main_menu == "🏛️ 50-Year Veteran ഇന്ത്യൻ നിക്ഷേപം":
-    st.title("🏛️ 50-Year Veteran ഇന്ത്യൻ വെൽത്ത് നിലവറ")
-    st.caption("വാറൻ ബഫറ്റ് ശൈലി: കടമില്ലാത്ത, ശക്തമായ കുത്തകയുള്ള, എഐ (AI) ഭീഷണിയില്ലാത്ത കമ്പനികൾ.")
+elif main_menu == "🏛️ 50-Year Veteran ദീർഘകാല നിക്ഷേപം (1Y, 5Y, 10Y)":
+    st.title("🏛️ 50-Year Veteran ദീർഘകാല നിക്ഷേപ നിലവറ")
+    st.caption("കാലാവധിയും (1 Year, 5 Years, 10+ Years) നിക്ഷേപ ശൈലിയും അനുസരിച്ച് ശാസ്ത്രീയമായി ചിട്ടപ്പെടുത്തിയ മാസ്റ്റർ പോർട്ട്ഫോളിയോ.")
 
-    v_tab1, v_tab2 = st.tabs(["🛡️ ഓൾ-വെതർ കുത്തകകൾ", "⚡ എഐ യുഗത്തിൽ കുതിക്കുന്നവ"])
-    with v_tab1:
-        all_weather_stocks = [
-            {"Stock": "CDSL", "Moat": "റെഗുലേറ്ററി കുത്തക", "ROCE": "33.5%", "Debt": "0.0", "AI Risk": "🟢 പൂജ്യം", "Resilience": "⭐⭐⭐⭐⭐"},
-            {"Stock": "CAMS", "Moat": "ഡാറ്റ കുത്തക", "ROCE": "44.2%", "Debt": "0.0", "AI Risk": "🟢 പൂജ്യം", "Resilience": "⭐⭐⭐⭐⭐"},
-            {"Stock": "HAL", "Moat": "പ്രതിരോധ കുത്തക", "ROCE": "31.8%", "Debt": "0.0", "AI Risk": "🟢 പൂജ്യം", "Resilience": "⭐⭐⭐⭐⭐"},
-            {"Stock": "ITC Limited", "Moat": "ഉപഭോക്തൃ കുത്തക", "ROCE": "39.1%", "Debt": "0.0", "AI Risk": "🟢 പൂജ്യം", "Resilience": "⭐⭐⭐⭐⭐"},
-            {"Stock": "Sun Pharma", "Moat": "ഇലാസ്തികതയില്ലാത്ത ഫാർമ", "ROCE": "17.8%", "Debt": "0.05", "AI Risk": "🟢 പൂജ്യം", "Resilience": "⭐⭐⭐⭐"}
-        ]
-        st.dataframe(pd.DataFrame(all_weather_stocks), use_container_width=True, hide_index=True)
+    # ഫിൽട്ടറുകൾ
+    c_f1, c_f2 = st.columns([1.5, 1.5])
+    with c_f1:
+        time_horizon = st.radio(
+            "⏳ നിങ്ങളുടെ നിക്ഷേപ കാലാവധി തിരഞ്ഞെടുക്കുക:",
+            [
+                "⏳ 1 വർഷം (Tactical & High Momentum Compounders)",
+                "🚀 5 വർഷം (High Growth Multibagger Champions)",
+                "🏛️ 10+ വർഷം (Generational Wealth / Coffee Can Monopolies)"
+            ]
+        )
+    with c_f2:
+        style_choice = st.radio(
+            "🎯 നിക്ഷേപ ശൈലി (Investment Style):",
+            [
+                "🔥 അതിവേഗ ഗ്രോത്ത് ഓഹരികൾ (High Growth & Sales Expansion)",
+                "🛡️ സുരക്ഷിതമായ വാല്യൂ കുത്തകകൾ (Defensive Monopolies & High ROCE)"
+            ]
+        )
 
-    with v_tab2:
-        ai_beneficiaries = [
-            {"Stock": "Power Grid", "Moat": "പവർ ട്രാൻസ്മിഷൻ കുത്തക", "Why AI Drives?": "AI ഡാറ്റാ സെന്ററുകൾക്ക് ഹൈ-വോൾട്ടേജ് പവർ എത്തിക്കാൻ മറ്റൊരു ബദലില്ല.", "Yield": "3.5%+"},
-            {"Stock": "NTPC", "Moat": "വൈദ്യുതി ഉൽപ്പാദകൻ", "Why AI Drives?": "സെർവറുകൾക്ക് ആവശ്യമായ ബേസ്‌ലോഡ് പവറും ഗ്രീൻ എനർജിയും നൽകുന്നു.", "Yield": "3.0%+"},
-            {"Stock": "L&T", "Moat": "ഹൈ-ടെക് നിർമ്മാണം", "Why AI Drives?": "ഡാറ്റാ സെന്ററുകളും ചിപ്പ് ഫാക്ടറികളും പണിയാൻ കഴിവുള്ള ഏക ഭീമൻ.", "Yield": "1.2%"},
-            {"Stock": "Bharti Airtel", "Moat": "ടെലികോം ഡ്യുവോപൊളി", "Why AI Drives?": "5G സ്പെക്‌ട്രവും ഒപ്റ്റിക് ഫൈബറും ഉള്ള സ്ഥാപനം.", "Yield": "1.0%"}
-        ]
-        st.dataframe(pd.DataFrame(ai_beneficiaries), use_container_width=True, hide_index=True)
+    st.divider()
+
+    # 1. ഒരു വർഷത്തെ പോർട്ട്‌ഫോളിയോ (1-Year Horizon)
+    if "1 വർഷം" in time_horizon:
+        st.subheader("⏳ 1 വർഷത്തെ നിക്ഷേപത്തിന് ഏറ്റവും അനുയോജ്യമായ ഓഹരികൾ")
+        st.info("💡 **വിദഗ്ദ്ധ തത്വം:** 1 വർഷത്തിൽ ബിസിനസ്സ് പൂർണ്ണമായി വളരുന്നതിനേക്കാൾ, ഉയർന്ന ഓർഡറുകളും, ലാഭം 25%-ൽ കൂടുതൽ കുതിച്ചുയരുന്നതുമായ (Quarterly Earnings Momentum) സൈക്ലിക്കൽ കമ്പനികളാണ് ഏറ്റവും കൂടുതൽ റിട്ടേൺ തരുന്നത്.")
+
+        if "അതിവേഗ ഗ്രോത്ത്" in style_choice:
+            data_1y_growth = [
+                {"Stock": "Zomato / Eternal", "Sector": "Quick Commerce / Food Delivery", "Quarterly Profit Growth": "120%+", "Expected 1Y CAGR": "25% - 35%", "Moat & Catalyst": "Blinkit വഴി ക്വിക്ക് കൊമേഴ്‌സ് വിപണി പിടിച്ചെടുക്കുന്നു. ലാഭക്ഷമത അതിവേഗം കൂടുന്നു."},
+                {"Stock": "Varun Beverages (VBL)", "Sector": "FMCG / Beverages", "Quarterly Profit Growth": "28%+", "Expected 1Y CAGR": "20% - 25%", "Moat & Catalyst": "പെപ്സികോയുടെ ആഗോള വിതരണ കുത്തക. ആഫ്രിക്കൻ വിപണിയിലെ അതിവേഗ വിപുലീകരണം."},
+                {"Stock": "Tata Power", "Sector": "Energy / EV / Solar", "Quarterly Profit Growth": "30%+", "Expected 1Y CAGR": "20% - 30%", "Moat & Catalyst": "ഇന്ത്യയിലെ ഇലക്ട്രിക് വാഹന ചാർജിംഗ് ശൃംഖല, പുനരുപയോഗ ഊർജ്ജ ഓർഡറുകളുടെ വൻകുതിപ്പ്."},
+                {"Stock": "Persistent Systems", "Sector": "IT / Digital Engineering", "Quarterly Profit Growth": "24%+", "Expected 1Y CAGR": "22% - 28%", "Moat & Catalyst": "ജനറേറ്റീവ് AI, ക്ലൗഡ് പ്രൊജക്റ്റുകളിൽ ഏറ്റവും വേഗത്തിൽ ഡീലുകൾ സ്വന്തമാക്കുന്ന ഐടി താരം."},
+                {"Stock": "Bharat Forge", "Sector": "Auto Ancillary / Defence", "Quarterly Profit Growth": "35%+", "Expected 1Y CAGR": "20% - 26%", "Moat & Catalyst": "പ്രതിരോധ പീരങ്കികളും, ആഗോള എയ്റോസ്പേസ് പാർട്സുകളും നിർമ്മിക്കുന്നതിലൂടെ വൻ വരുമാനം."}
+            ]
+            st.dataframe(pd.DataFrame(data_1y_growth), use_container_width=True, hide_index=True)
+        else:
+            data_1y_value = [
+                {"Stock": "Bharat Electronics (BEL)", "Sector": "Defence Electronics", "P/E": 38.0, "ROCE": "28.5%", "Debt/Equity": "0.0", "Expected 1Y CAGR": "18% - 24%", "Moat & Catalyst": "പൂർണ്ണമായും കടരഹിതം. പ്രതിരോധ റഡാറുകളിൽ 70% വിപണി കുത്തക. ബജറ്റ് വിഹിതം വർദ്ധിക്കുന്നു."},
+                {"Stock": "State Bank of India (SBIN)", "Sector": "Banking / PSU", "P/E": 11.0, "ROCE": "18.5%", "Debt/Equity": "0.8", "Expected 1Y CAGR": "16% - 22%", "Moat & Catalyst": "ഇന്ത്യയിലെ ഏറ്റവും വലിയ വായ്പാ ദാതാവ്. കുറഞ്ഞ വാല്യുവേഷൻ, സുരക്ഷിതമായ ക്രെഡിറ്റ് വളർച്ച."},
+                {"Stock": "Coal India", "Sector": "Energy Mining", "P/E": 8.5, "ROCE": "52.0%", "Debt/Equity": "0.1", "Expected 1Y CAGR": "15% - 20%", "Moat & Catalyst": "5.5%+ ഡിവിഡന്റ് യീൽഡ്. ഇന്ത്യയുടെ വൈദ്യുതി ഉൽപ്പാദനത്തിന് കൽക്കരി അല്ലാതെ മറ്റൊരു ബദലില്ല."},
+                {"Stock": "Cummins India", "Sector": "Industrial Engines", "P/E": 39.0, "ROCE": "24.0%", "Debt/Equity": "0.0", "Expected 1Y CAGR": "18% - 25%", "Moat & Catalyst": "ഡാറ്റാ സെന്ററുകൾക്ക് ആവശ്യമായ ജനറേറ്ററുകൾ നൽകുന്ന കുത്തക."}
+            ]
+            st.dataframe(pd.DataFrame(data_1y_value), use_container_width=True, hide_index=True)
+
+    # 2. അഞ്ചു വർഷത്തെ പോർട്ട്‌ഫോളിയോ (5-Year Horizon)
+    elif "5 വർഷം" in time_horizon:
+        st.subheader("🚀 5 വർഷത്തെ നിക്ഷേപത്തിന് ഏറ്റവും അനുയോജ്യമായ ഓഹരികൾ")
+        st.info("💡 **പീറ്റർ ലിഞ്ച് ശൈലി:** ഇന്ത്യയിലെ ഉപഭോഗ സംസ്കാരം മാറുന്നതിനൊപ്പം വർഷം തോറും 20%-30% വേഗതയിൽ വിറ്റുവരവും ലാഭവും ഇരട്ടിയാക്കാൻ ശേഷിയുള്ള 'ഹൈ-ഗ്രോത്ത് ചാമ്പ്യന്മാർ'.")
+
+        if "അതിവേഗ ഗ്രോത്ത്" in style_choice:
+            data_5y_growth = [
+                {"Stock": "Trent Ltd (Zudio / Westside)", "Sector": "Retail / Fashion", "3Y Sales CAGR": "48%+", "ROCE": "26.5%", "Expected 5Y CAGR": "28% - 35%", "50-Year Veteran Thesis": "ടാറ്റാ ഗ്രൂപ്പിന്റെ ഏറ്റവും വിജയകരമായ റീട്ടെയിൽ വിപ്ലവം. അതിവേഗ സ്റ്റോർ വിപുലീകരണത്തിലൂടെ ഇന്ത്യയിലെ അൺ-ഓർഗനൈസ്ഡ് തുണി വിപണി പിടിച്ചെടുക്കുന്നു."},
+                {"Stock": "Polycab India", "Sector": "Cables & Wires / FMEG", "3Y Sales CAGR": "22%+", "ROCE": "28.5%", "Expected 5Y CAGR": "22% - 28%", "50-Year Veteran Thesis": "ഇന്ത്യയിലെ ഓരോ പുതിയ വീടിനും ഇൻഫ്രാസ്ട്രക്ചറിനും വയറുകൾ നൽകുന്ന 25% വിപണി വിഹിതമുള്ള രാജാവ്. വൻ റീട്ടെയിൽ ശൃംഖല."},
+                {"Stock": "Dixon Technologies", "Sector": "Electronics Manufacturing (EMS)", "3Y Sales CAGR": "35%+", "ROCE": "25.0%", "Expected 5Y CAGR": "25% - 32%", "50-Year Veteran Thesis": "ഇന്ത്യയിലെ ഫോക്സ്കോൺ (Foxconn of India). മൊബൈലുകളും ടിവികളും ഇന്ത്യയിൽ നിർമ്മിക്കാൻ സാംസങ്, ഷവോമി അടക്കമുള്ളവർ ഡിക്സണെ ആശ്രയിക്കുന്നു."},
+                {"Stock": "Solar Industries", "Sector": "Industrial Explosives / Defence", "3Y Sales CAGR": "30%+", "ROCE": "27.0%", "Expected 5Y CAGR": "24% - 30%", "50-Year Veteran Thesis": "ഖനനത്തിനും മിസൈലുകൾക്കും ആവശ്യമായ സ്ഫോടകവസ്തുക്കളിലെ അന്താരാഷ്ട്ര കുത്തക. വലിയ എൻട്രി ബാരിയർ."},
+                {"Stock": "Astral Limited", "Sector": "Building Materials / Pipes", "3Y Sales CAGR": "20%+", "ROCE": "23.0%", "Expected 5Y CAGR": "20% - 25%", "50-Year Veteran Thesis": "പ്ലംബിംഗ് പൈപ്പുകളിലെ പ്രീമിയം ബ്രാൻഡ് പവർ. അഡെസിവുകളിലേക്കും പെയിന്റുകളിലേക്കും ബിസിനസ്സ് വ്യാപിപ്പിക്കുന്നു."}
+            ]
+            st.dataframe(pd.DataFrame(data_5y_growth), use_container_width=True, hide_index=True)
+        else:
+            data_5y_value = [
+                {"Stock": "Titan Company", "Sector": "Jewellery / Luxury Watches", "3Y Sales CAGR": "24%+", "ROCE": "31.0%", "Expected 5Y CAGR": "18% - 23%", "50-Year Veteran Thesis": "ഇന്ത്യയിലെ സ്വർണ്ണാഭരണ വിപണി തനിഷ്കിലേക്ക് മാറുന്നു. ടാറ്റാ ബ്രാൻഡിലുള്ള അന്ധമായ വിശ്വാസ്യതയാണ് ഇവരുടെ സാമ്പത്തിക കോട്ട."},
+                {"Stock": "Hindustan Aeronautics (HAL)", "Sector": "Defence Manufacturing", "3Y Sales CAGR": "12%+", "ROCE": "31.8%", "Expected 5Y CAGR": "20% - 26%", "50-Year Veteran Thesis": "പൂർണ്ണമായും കടരഹിതം. തദ്ദേശീയ ഫൈറ്റർ ജെറ്റുകളുടെയും ഹെലികോപ്റ്ററുകളുടെയും അടുത്ത 8 വർഷത്തെ നിർമ്മാണ ഓർഡറുകൾ ഉറപ്പാണ്."},
+                {"Stock": "Larsen & Toubro (L&T)", "Sector": "Infrastructure / Hi-Tech", "3Y Sales CAGR": "18%+", "ROCE": "16.5%", "Expected 5Y CAGR": "17% - 22%", "50-Year Veteran Thesis": "ഇന്ത്യയുടെ ₹100 ലക്ഷം കോടിയുടെ ദേശീയ അടിസ്ഥാന സൗകര്യ വികസനത്തിന്റെ (NIP) ഏറ്റവും വലിയ ഗുണഭോക്താവ്."},
+                {"Stock": "Tata Motors", "Sector": "Automobile / EV", "3Y Sales CAGR": "25%+", "ROCE": "19.5%", "Expected 5Y CAGR": "18% - 24%", "50-Year Veteran Thesis": "ഇന്ത്യൻ ഇലക്ട്രിക് പാസഞ്ചർ കാർ വിപണിയുടെ 70% കുത്തക. JLR ആഡംബര കാറുകളുടെ ആഗോള ലാഭം."}
+            ]
+            st.dataframe(pd.DataFrame(data_5y_value), use_container_width=True, hide_index=True)
+
+    # 3. പത്തു വർഷത്തിലധികം (10+ Years Generational Horizon)
+    else:
+        st.subheader("🏛️ 10+ വർഷത്തെ തലമുറകൾക്കായുള്ള 'കോഫി കാൻ' (Coffee Can) ഓഹരികൾ")
+        st.info("💡 **വാറൻ ബഫറ്റ് ശൈലി:** വാങ്ങിയിട്ട് മറന്നുപോയാലും പണം പല മടങ്ങായി വളരുന്ന, പൂജ്യം കടമുള്ള, എഐ (AI) വിപ്ലവത്തിലും മാർക്കറ്റ് ക്രാഷിലും തകരാത്ത നിത്യഹരിത കുത്തകകൾ.")
+
+        if "അതിവേഗ ഗ്രോത്ത്" in style_choice:
+            data_10y_growth = [
+                {"Stock": "CDSL", "Sector": "Capital Markets Depository", "10Y Compounding Power": "ഉയർന്ന ഡിമാറ്റ് അക്കൗണ്ട് വളർച്ച", "Debt": "0.0", "ROCE": "33.5%", "Expected 10Y CAGR": "20% - 25%", "Veteran Thesis": "ഇന്ത്യയിൽ 140 കോടി ജനങ്ങളിൽ വെറും 10 കോടി ഡിമാറ്റ് അക്കൗണ്ടുകൾ മാത്രമേ ആയിട്ടുള്ളൂ. അടുത്ത 10 വർഷം കൊണ്ട് ഇത് 3 ഇരട്ടിയാകും. ടോൾ ബൂത്ത് പോലെ ലാഭം."},
+                {"Stock": "CAMS", "Sector": "Mutual Fund Registrar", "10Y Compounding Power": "SIP സംസ്കാരത്തിന്റെ വർദ്ധനവ്", "Debt": "0.0", "ROCE": "44.2%", "Expected 10Y CAGR": "18% - 23%", "Veteran Thesis": "ഇന്ത്യൻ മ്യൂച്വൽ ഫണ്ടുകളുടെ 70% ബാക്ക്-എൻഡ് നിയന്ത്രിക്കുന്നു. ഓരോ മാസവും പുതിയ SIP വരുമ്പോഴും CAMS പണം ഉണ്ടാക്കുന്നു."},
+                {"Stock": "Bajaj Finance", "Sector": "Consumer Lending / Fintech", "10Y Compounding Power": "ഇന്ത്യയുടെ കൺസംപ്ഷൻ വായ്പകൾ", "Debt": "നിയന്ത്രിതം", "ROCE": "19.5%", "Expected 10Y CAGR": "18% - 22%", "Veteran Thesis": "ഇന്ത്യയിലെ ഏറ്റവും മികച്ച ഡാറ്റാബേസും റിസ്ക് മാനേജ്മെന്റുമുള്ള ബാങ്കിംഗ് ഇതര സ്ഥാപനം."},
+                {"Stock": "Tata Consumer Products", "Sector": "FMCG / Essentials", "10Y Compounding Power": "ബ്രാൻഡഡ് പലവ്യഞ്ജനങ്ങൾ", "Debt": "0.1", "ROCE": "14.5%", "Expected 10Y CAGR": "16% - 20%", "Veteran Thesis": "ഉപ്പ്, ചായ, പയർവർഗ്ഗങ്ങൾ തുടങ്ങിയ പാക്കേജ്ഡ് ഭക്ഷണങ്ങളിലെ ടാറ്റാ ബ്രാൻഡ് പവർ."}
+            ]
+            st.dataframe(pd.DataFrame(data_10y_growth), use_container_width=True, hide_index=True)
+        else:
+            data_10y_value = [
+                {"Stock": "Tata Consultancy Services (TCS)", "Sector": "IT Software", "10Y Compounding Power": "ആഗോള ഡിജിറ്റൽ പരിവർത്തനം", "Debt": "0.0", "ROCE": "58.2%", "Expected 10Y CAGR": "14% - 17%", "Veteran Thesis": "ലോകത്തെ ഏറ്റവും സുരക്ഷിതമായ ഐടി ഭീമൻ. ഭീമമായ ക്യാഷ് ഫ്ലോ. ഡിവിഡന്റും ബോണസും വഴി നിക്ഷേപകരെ ധനികരാക്കുന്ന ചരിത്രം."},
+                {"Stock": "ITC Limited", "Sector": "FMCG / Cash Cow", "10Y Compounding Power": "കുത്തക പുകയില & വൻകിട FMCG", "Debt": "0.0", "ROCE": "39.1%", "Expected 10Y CAGR": "15% - 18%", "Veteran Thesis": "പൂർണ്ണമായും കടരഹിതം. മാർക്കറ്റ് തകർന്നാലും ആളുകൾ പുകവലിയും ബിസ്ക്കറ്റ് വാങ്ങലും നിർത്തില്ല. സ്ഥിരമായ 3%+ ഡിവിഡന്റ്."},
+                {"Stock": "Asian Paints", "Sector": "Home Improvement", "10Y Compounding Power": "വിതരണ ശൃംഖലയുടെ കുത്തക", "Debt": "0.05", "ROCE": "34.0%", "Expected 10Y CAGR": "15% - 19%", "Veteran Thesis": "ഇന്ത്യയിലെ പെയിന്റ് വിപണിയിൽ 50 വർഷമായി ഒന്നാം സ്ഥാനം. ആർക്കും തകർക്കാനാവാത്ത ഡീലർ ശൃംഖല."},
+                {"Stock": "Sun Pharma", "Sector": "Healthcare & Medicine", "10Y Compounding Power": "ജീവൻരക്ഷാ മരുന്നുകൾ", "Debt": "0.05", "ROCE": "17.8%", "Expected 10Y CAGR": "14% - 18%", "Veteran Thesis": "ആഗോള തലത്തിൽ അസുഖങ്ങൾക്ക് മരുന്ന് കഴിക്കാതിരിക്കാൻ മനുഷ്യർക്ക് കഴിയില്ല. പൂർണ്ണമായും സാമ്പത്തിക മാന്ദ്യത്തെ അതിജീവിക്കുന്ന ബിസിനസ്സ്."}
+            ]
+            st.dataframe(pd.DataFrame(data_10y_value), use_container_width=True, hide_index=True)
 
 # ##################################################################
 # 📈 വിഭാഗം 3: മികച്ച മ്യൂച്വൽ ഫണ്ടുകൾ (SIP)
@@ -436,7 +506,7 @@ elif main_menu == "🥇 ഗോൾഡ്, സിൽവർ & റിയൽ എസ�
         al5.metric("💵 ക്രാഷ് ക്യാഷ് / സേവിങ്സ് (15%)", f"₹{(total_savings*0.15):,.0f}")
 
 # ##################################################################
-# 🌙 വിഭാഗം 6: ശരീഅത്ത് & എത്തിക്കൽ നിക്ഷേപം (Halal Wealth Hub) - NEW!
+# 🌙 വിഭാഗം 6: ശരീഅത്ത് & എത്തിക്കൽ നിക്ഷേപം (Halal Wealth Hub)
 # ##################################################################
 elif main_menu == "🌙 ശരീഅത്ത് & എത്തിക്കൽ നിക്ഷേപം (Halal Wealth)":
     st.title("🌙 ശരീഅത്ത് & എത്തിക്കൽ വെൽത്ത് ഹബ് (Halal Investing)")
@@ -452,60 +522,37 @@ elif main_menu == "🌙 ശരീഅത്ത് & എത്തിക്കൽ �
     ])
 
     with h_tab1:
-        st.subheader("🇮🇳 ഇന്ത്യയിലെ ഏറ്റവും മികച്ച ശരീഅത്ത് ഓഹരികൾ (Nifty Shariah)")
-        st.markdown("""
-        **50-വർഷത്തെ വിദഗ്ദ്ധ ഫിൽട്ടർ:**
-        പൂർണ്ണമായും കടരഹിതമായ, ഉയർന്ന ROCE ഉള്ള, ഇസ്‌ലാമിക പണ്ഡിതന്മാരുടെ നിരീക്ഷണത്തിലുള്ള കമ്പനികൾ:
-        """)
-
         halal_indian = [
-            {"Stock": "Tata Consultancy Services (TCS)", "Sector": "IT Services", "Debt": "0.0 (കടരഹിതം)", "ROCE (%)": "58.2%", "Shariah Status": "✅ 100% Compliant", "Why Invest?": "ഇന്ത്യയിലെ ഏറ്റവും വലിയ ഐടി കമ്പനി, ഭീമമായ ക്യാഷ് ഫ്ലോ, ഉയർന്ന ഡിവിഡന്റ്."},
-            {"Stock": "Tata Elxsi", "Sector": "High-Tech Design / EV", "Debt": "0.0 (കടരഹിതം)", "ROCE (%)": "42.5%", "Shariah Status": "✅ 100% Compliant", "Why Invest?": "ഇലക്ട്രിക് വാഹന സോഫ്റ്റ്‌വെയറിലും AI ഡിസൈനിലും വിപണി മേധാവിത്വം."},
-            {"Stock": "Cipla Limited", "Sector": "Pharmaceuticals", "Debt": "0.02 (നെഗ്ലിജിബിൾ)", "ROCE (%)": "24.1%", "Shariah Status": "✅ 100% Compliant", "Why Invest?": "ആഗോള തലത്തിൽ ജീവൻരക്ഷാ മരുന്നുകൾ നിർമ്മിക്കുന്ന വിശ്വസനീയ കമ്പനി."},
-            {"Stock": "Asian Paints", "Sector": "Consumer / Paints", "Debt": "0.05", "ROCE (%)": "34.0%", "Shariah Status": "✅ 100% Compliant", "Why Invest?": "ഇന്ത്യയിലെ പെയിന്റ് വിപണിയുടെ 50% കൈയ്യാളുന്ന അത്യുഗ്രൻ കുത്തക."},
-            {"Stock": "Polycab India", "Sector": "Cables & Wires", "Debt": "0.01", "ROCE (%)": "28.5%", "Shariah Status": "✅ 100% Compliant", "Why Invest?": "ഇന്ത്യയുടെ വികസനത്തിൽ വീടുകൾക്കും ഇൻഫ്രാസ്ട്രക്ചറിനും കേബിളുകൾ നൽകുന്ന ഭീമൻ."}
+            {"Stock": "Tata Consultancy Services (TCS)", "Sector": "IT Services", "Debt": "0.0", "ROCE (%)": "58.2%", "Shariah Status": "✅ 100% Compliant"},
+            {"Stock": "Tata Elxsi", "Sector": "High-Tech Design / EV", "Debt": "0.0", "ROCE (%)": "42.5%", "Shariah Status": "✅ 100% Compliant"},
+            {"Stock": "Cipla Limited", "Sector": "Pharmaceuticals", "Debt": "0.02", "ROCE (%)": "24.1%", "Shariah Status": "✅ 100% Compliant"},
+            {"Stock": "Asian Paints", "Sector": "Consumer / Paints", "Debt": "0.05", "ROCE (%)": "34.0%", "Shariah Status": "✅ 100% Compliant"},
+            {"Stock": "Polycab India", "Sector": "Cables & Wires", "Debt": "0.01", "ROCE (%)": "28.5%", "Shariah Status": "✅ 100% Compliant"}
         ]
         st.dataframe(pd.DataFrame(halal_indian), use_container_width=True, hide_index=True)
 
     with h_tab2:
-        st.subheader("🇺🇸 ആഗോള ഹലാൽ വമ്പന്മാർ (Global Halal Monopolies)")
-        st.markdown("""
-        ആഗോള ഇസ്‌ലാമിക ഇ.ടി.എഫുകളായ **SPUS**, **HLAL** എന്നിവയിൽ മുൻനിരയിൽ നിൽക്കുന്ന കടബാധ്യത കുറഞ്ഞ ആഗോള ഭീമന്മാർ:
-        """)
-
         halal_global = [
-            {"Company": "Nvidia (NVDA)", "Sector": "AI Computing / Hardware", "Shariah Status": "✅ Compliant", "Moat": "AI കമ്പ്യൂട്ടിംഗ് ചിപ്പുകളിലെ ആഗോള കുത്തക. പലിശ വരുമാനമില്ലാത്ത ശുദ്ധമായ ഹാർഡ്‌വെയർ ബിസിനസ്സ്."},
-            {"Company": "Microsoft (MSFT)", "Sector": "Enterprise Software", "Shariah Status": "✅ Compliant (Filtered)", "Moat": "ലോകത്തെ എല്ലാ ഓഫീസുകളും പ്രവർത്തിക്കുന്ന സോഫ്റ്റ്‌വെയർ ശൃംഖല."},
-            {"Company": "Alphabet (Google)", "Sector": "Search & Cloud", "Shariah Status": "✅ Compliant", "Moat": "സൗജന്യ അറിവും യൂട്യൂബും വഴി പരസ്യ വരുമാനം നേടുന്ന കുത്തക."},
-            {"Company": "Johnson & Johnson (JNJ)", "Sector": "Healthcare & MedTech", "Shariah Status": "✅ Compliant", "Moat": "ആഗോള ആരോഗ്യ സംരക്ഷണ വിപണിയിലെ അതികായന്മാർ."}
+            {"Company": "Nvidia (NVDA)", "Sector": "AI Computing / Hardware", "Shariah Status": "✅ Compliant"},
+            {"Company": "Microsoft (MSFT)", "Sector": "Enterprise Software", "Shariah Status": "✅ Compliant (Filtered)"},
+            {"Company": "Alphabet (Google)", "Sector": "Search & Cloud", "Shariah Status": "✅ Compliant"},
+            {"Company": "Johnson & Johnson (JNJ)", "Sector": "Healthcare & MedTech", "Shariah Status": "✅ Compliant"}
         ]
         st.dataframe(pd.DataFrame(halal_global), use_container_width=True, hide_index=True)
 
     with h_tab3:
-        st.subheader("📜 ഇസ്‌ലാമിക വിധികൾ: ട്രേഡിംഗ് vs ഇൻവെസ്റ്റ്മെന്റ്")
         st.markdown("""
-        **ആഗോള ഇസ്‌ലാമിക പണ്ഡിത സഭകളുടെ (AAOIFI, OIC Fiqh Academy) വ്യക്തമായ വിധികൾ:**
-
-        1. **❌ ഫ്യൂച്ചേഴ്സ് & ഓപ്ഷൻസ് (F&O / Derivatives) - പൂർണ്ണമായും ഹറാം:**
-           * കയ്യിലില്ലാത്തത് വിൽക്കൽ (Gharar), അമിതമായ ഊഹക്കച്ചവടവും ചൂതാട്ടവും (Qimar) വരുന്നതിനാൽ ഡെറിവേറ്റീവ്സ് ഇസ്‌ലാമിൽ അനുവദനീയമല്ല.
-        2. **❌ ലിവറേജും ഇൻട്രാഡേ ഷോർട്ട് സെല്ലിംഗും - വിലക്കപ്പെട്ടത്:**
-           * ബ്രോക്കറുടെ കയ്യിൽ നിന്ന് കടമെടുത്ത് (Leverage) വ്യാപാരം ചെയ്യുന്നതും, കയ്യിലില്ലാത്ത ഓഹരികൾ വിൽക്കുന്നതും (Short Selling) അനുവദനീയമല്ല.
-        3. **✅ ഡെലിവറി ഇക്വിറ്റി ഇൻവെസ്റ്റ്മെന്റ് (Cash Delivery) - 100% ഹലാൽ:**
-           * സ്വന്തം പണം നൽകി ഒരു കമ്പനിയുടെ ഓഹരികൾ വാങ്ങി, അത് ഡിമാറ്റ് അക്കൗണ്ടിൽ ഉടമസ്ഥാവകാശം (Qabd) നേടി ലാഭത്തിലോ നഷ്ടത്തിലോ പങ്കാളിയാകുന്നത് പൂർണ്ണമായും അനുവദനീയമാണ്.
-        4. **💧 ലാഭ ശുദ്ധീകരണം (Purification):**
-           * കമ്പനിയുടെ പക്കൽ ബാങ്ക് ഡിപ്പോസിറ്റുകളിൽ നിന്നുള്ള ചെറിയ പലിശ വരുമാനം (5%-ൽ താഴെ) വന്നിട്ടുണ്ടെങ്കിൽ, ആ അനുപാതത്തിലുള്ള തുക സ്വന്തം ആവശ്യങ്ങൾക്ക് ഉപയോഗിക്കാതെ പാവങ്ങൾക്ക് ദാനം ചെയ്യണം.
+        1. **❌ ഫ്യൂച്ചേഴ്സ് & ഓപ്ഷൻസ് (F&O / Derivatives) - പൂർണ്ണമായും ഹറാം.**
+        2. **❌ ലിവറേജും ഇൻട്രാഡേ ഷോർട്ട് സെല്ലിംഗും - വിലക്കപ്പെട്ടത്.**
+        3. **✅ ഡെലിവറി ഇക്വിറ്റി ഇൻവെസ്റ്റ്മെന്റ് (Cash Delivery) - 100% ഹലാൽ.**
+        4. **💧 ലാഭ ശുദ്ധീകരണം (Purification):** പലിശ വരുമാനം (5%-ൽ താഴെ) വന്നിട്ടുണ്ടെങ്കിൽ അത് ചാരിറ്റിയിലേക്ക് നൽകണം.
         """)
 
     with h_tab4:
-        st.subheader("🕋 ഇന്ത്യയിലെ ശരീഅത്ത് മ്യൂച്വൽ ഫണ്ടുകളും ഗോൾഡും")
-        st.markdown("""
-        ടെൻഷനില്ലാതെ മാസം തോറും (SIP) ഹലാൽ രീതിയിൽ നിക്ഷേപിക്കാൻ പറ്റിയ ലൈസൻസുള്ള ഇന്ത്യൻ ഫണ്ടുകൾ:
-        """)
-
         ethical_funds = [
-            {"Fund Name": "Tata Ethical Fund", "Type": "Shariah Equity Mutual Fund", "3Y CAGR": "20.8%", "5Y CAGR": "22.5%", "Shariah Board": "ശരീഅത്ത് സമിതിയുടെ നിരന്തര മേൽനോട്ടം", "Details": "ഇന്ത്യയിലെ ഏറ്റവും പഴയതും വലുതുമായ ശരീഅത്ത് ഫണ്ട്. പലിശ ബാങ്കുകളിലോ മദ്യ കമ്പനികളിലോ നിക്ഷേപിക്കില്ല."},
-            {"Fund Name": "Taurus Ethical Fund", "Type": "Shariah Equity Mutual Fund", "3Y CAGR": "22.1%", "5Y CAGR": "21.2%", "Shariah Board": "S&P BSE 500 Shariah ഇൻഡക്സ് ട്രാക്കിംഗ്", "Details": "കർശനമായ ഇസ്‌ലാമിക ഫിൽട്ടറിംഗ് നടത്തുന്ന പ്യുവർ ഇക്വിറ്റി ഫണ്ട്."},
-            {"Fund Name": "Nippon Gold BeES / HDFC Gold", "Type": "Physical Gold ETF", "Purity": "99.5% 24K Physical Gold", "AAOIFI Standard": "സ്റ്റാൻഡേർഡ് 57 പ്രകാരം അനുവദനീയം", "Details": "100% യഥാർത്ഥ സ്വർണ്ണം ലോക്കറുകളിൽ സൂക്ഷിച്ചിട്ടുള്ളതിനാൽ പേപ്പർ ഗോൾഡ് പോലെയല്ല, അനുവദനീയമാണ്."}
+            {"Fund Name": "Tata Ethical Fund", "Type": "Shariah Equity Mutual Fund", "3Y CAGR": "20.8%", "5Y CAGR": "22.5%"},
+            {"Fund Name": "Taurus Ethical Fund", "Type": "Shariah Equity Mutual Fund", "3Y CAGR": "22.1%", "5Y CAGR": "21.2%"},
+            {"Fund Name": "Nippon Gold BeES / HDFC Gold", "Type": "Physical Gold ETF", "Purity": "99.5% 24K Physical Gold"}
         ]
         st.dataframe(pd.DataFrame(ethical_funds), use_container_width=True, hide_index=True)
 
