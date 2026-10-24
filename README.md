@@ -1,13 +1,16 @@
 # 🏛️ Autonomous Wealth OS & Institutional Algo Trading Platform
 
+[![Live Web App](https://img.shields.io/badge/🚀_Live_App-Open_in_Streamlit-FF4B4B?style=for-the-badge)](https://my-trading-bot-wyjcnfn2bprzd4ysp8riie.streamlit.app)
 [![Python](https://img.shields.io/badge/Python-3.10+-3776AB?style=for-the-badge&logo=python&logoColor=white)](https://python.org)
-[![Streamlit](https://img.shields.io/badge/Streamlit-FF4B4B?style=for-the-badge&logo=streamlit&logoColor=white)](https://streamlit.io)
-[![Broker API](https://img.shields.io/badge/Upstox-API_v2-0052CC?style=for-the-badge)](https://upstox.com)
-[![Database](https://img.shields.io/badge/SQLite3-Embedded-003B57?style=for-the-badge&logo=sqlite&logoColor=white)](https://sqlite.org)
+[![Brokers](https://img.shields.io/badge/Brokers-Upstox_|_Dhan_|_Zerodha-0052CC?style=for-the-badge)](https://upstox.com)
+[![Security](https://img.shields.io/badge/Privacy-SHA256_Multi--User_Vault-success?style=for-the-badge)](https://sqlite.org)
 [![Compliance](https://img.shields.io/badge/AAOIFI-Shariah_Screening-009688?style=for-the-badge)](https://aaoifi.com)
 [![License](https://img.shields.io/badge/License-MIT-green.svg?style=for-the-badge)](LICENSE)
 
-An institutional-grade, multi-asset wealth management and algorithmic execution platform built in Python. Designed around the disciplined, 50-year capital-preservation principles of legends like Warren Buffett, Charlie Munger, and Howard Marks, the platform combines **high-probability tactical intraday execution** with **long-term macroeconomic generational wealth creation**.
+An institutional-grade, multi-user, multi-broker wealth management and algorithmic execution platform built in Python. Designed around the disciplined, 50-year capital-preservation principles of legends like Warren Buffett, Charlie Munger, and Howard Marks, the platform combines **high-probability tactical intraday execution** with **long-term macroeconomic generational wealth creation**.
+
+🌐 **Live Cloud Deployment:** [Launch Autonomous Wealth OS](https://my-trading-bot-wyjcnfn2bprzd4ysp8riie.streamlit.app)  
+🗣️ **Supported Languages:** English | മലയാളം (Malayalam) | हिन्दी (Hindi) | العربية (Arabic)
 
 ---
 
@@ -15,51 +18,51 @@ An institutional-grade, multi-asset wealth management and algorithmic execution 
 
 | Module | Core Functionality | Primary Focus |
 | :--- | :--- | :--- |
-| **⚡ Intraday Algo Engine** | Nifty Trend Guard, VWAP, Supertrend, ATR Stop-Loss | Capital Preservation & Low Drawdown |
+| **⚡ Multi-Broker Algo Engine** | 1-Click OAuth 2.0, Nifty Trend Guard, VWAP, EMA 9/21, ATR SL | Capital Preservation & Low Drawdown |
+| **🔐 Private Multi-User Vault** | SHA-256 Passkey Isolation & Encrypted OAuth State Matching | 100% Data Privacy for Public Users |
 | **🎯 Dynamic Goal Engine** | 1Y, 3-5Y, and 10+ Year Multi-Horizon Allocator | Macro Climate Sentinel & Crisis Sizing |
-| **💼 Live Demat Watchdog** | Broker API Holdings Sync & Automated Sell Triggers | Real-time Thesis & Governance Monitoring |
+| **💼 All-Broker Watchdog** | Upstox, Dhan, Zerodha API Sync & Groww Portfolio Tracker | Real-time Thesis & Exit Monitoring |
 | **🏛️ 50-Year Moat Vault** | Zero-Debt Monopolies & Pricing Power Leaders | Generational Compounders (Coffee Can) |
-| **🌙 100% Halal Wealth** | Pure AAOIFI Screening, SPUS/HLAL, Shariah Funds | Zero-Interest, Ethical Asset Allocation |
+| **🌙 100% Halal Wealth** | Pure AAOIFI Screening, SPUS/HLAL, Shariah Watchlist Lock | Zero-Interest, Ethical Asset Allocation |
 
 ---
 
-### 1. ⚡ Institutional Intraday Algo Engine
-* **Nifty Trend Guard:** Validates market directional alignment before initiating individual equity long positions.
-* **Volume Surge & VWAP Filters:** Eliminates false breakouts and market noise.
-* **Dynamic ATR Stop-Loss & Target:** Volatility-adjusted 1:2 risk-to-reward parameters.
-* **Consecutive Loss Circuit Breaker (Kill Switch):** Automatically shuts down execution after 2 consecutive stops to protect capital.
-* **45-Minute Stale Momentum Exit:** Auto-liquidates flat, non-trending trades at cost to prevent end-of-day decay.
-* **3:15 PM Penalty Enforcement:** Guaranteed square-off prior to broker auto-square-off penalties.
+### 1. ⚡ Multi-Broker Institutional Intraday Algo Engine
+* **Multi-Broker Execution:** Supports **Upstox API v2, DhanHQ, Zerodha Kite Connect, and Angel One**, alongside a zero-risk **Paper Trading Simulation Mode**.
+* **1-Click Automatic OAuth 2.0 Token Generator:** Seamless browser authentication with encrypted `state` verification—no manual token copy-pasting required.
+* **Nifty Trend Guard & Market Window Enforcement:** Validates Nifty 50 20-EMA alignment and restricts new entries strictly to the prime institutional window (**9:20 AM – 3:05 PM IST**).
+* **Dynamic ATR Position Sizing & Capital Cap:** Volatility-adjusted 1:2 risk-to-reward sizing capped automatically against available account capital.
+* **Consecutive Loss Circuit Breaker (Kill Switch):** Automatically halts execution after 2 consecutive stop-losses and dispatches instant **Telegram Bot Alerts**.
+* **45-Minute Stale Momentum & 3:15 PM Auto Square-Off:** Eliminates non-trending decay and guarantees full liquidation prior to broker auto-square-off penalties.
 
 ---
 
-### 2. 🎯 Dynamic Goal & Macro Climate Sentinel
-* **Time-Horizon Engine:** Flexible allocation models across **1-Year (Tactical), 3-5 Year (Growth), and 10+ Year (Generational)** horizons.
-* **Crisis Sentinel:** Dynamically shifts marginal capital allocations between Equities, Gold, and Liquid Cash based on geopolitical tensions, crude oil spikes, and market regimes.
+### 2. 🔐 Multi-User Privacy & Multilingual Architecture
+* **SHA-256 Encrypted Workspace Isolation:** Publicly accessible web app where each user unlocks their own isolated database vault and background trading thread using a secret Passkey.
+* **Real-Time 4-Language Switcher:** Instant UI localization across **English, Malayalam (മലയാളം), Hindi (हिन्दी), and Arabic (العربية)**.
 
 ---
 
-### 3. 💼 Live Demat Holdings Sync & Exit Sentinel
-* Integrates seamlessly with broker portfolios via Upstox API v2 (`/v2/portfolio/long-term-holdings`).
-* Continuously evaluates held assets against institutional sell triggers:
-  * Fundamental thesis breakdown
-  * Promoter integrity & governance alerts
-  * Capital allocation decay / Debt-to-equity breaches
-  * Severe technical breakdown (200-day EMA violations)
+### 3. 🎯 Dynamic Goal & Macro Climate Sentinel
+* **Time-Horizon Engine:** Flexible allocation models across **1-Year (Liquidity), 3-5 Year (Growth), and 10+ Year (Generational)** horizons.
+* **Crisis Sentinel:** Dynamically shifts marginal capital allocations between Equities, Physical Gold ETFs, and Liquid Cash based on geopolitical tensions, crude oil spikes, and market crashes.
 
 ---
 
-### 4. 🌙 100% Zero-Compromise Shariah Engine
+### 4. 💼 Multi-Broker Demat Holdings Sync & Exit Sentinel
+* Integrates seamlessly with **Upstox, Dhan, and Zerodha** long-term demat holdings, plus manual tracking for **Groww** portfolios.
+* Continuously evaluates held assets against institutional exit triggers and stop-loss thresholds.
+
+---
+
+### 5. 🌙 100% Zero-Compromise Shariah Engine
 * Built strictly according to **AAOIFI Standards** (Standard #57 for Gold, financial threshold screens: Debt < 33%, Interest securities < 33%, Non-halal revenue < 5%).
-* Master toggle enables an immediate system-wide lock eliminating conventional banking, interest-bearing instruments, and non-permissible equities.
-* Features dedicated research on **Nifty Shariah leaders, Global Halal Titans (SPUS/HLAL), and Tata Ethical Fund**.
+* Master toggle automatically switches the intraday scanner to a **100% Shariah-Compliant Watchlist** (`TCS`, `INFY`, `SUNPHARMA`, `RELIANCE`), excluding conventional banking stocks.
 
 ---
 
-### 5. 🌍 Global Wealth & Currency Arbitrage Hub
-* Curated research on the **Magnificent 7 & Berkshire Hathaway**.
-* **Dual Currency Appreciation Calculator:** Demonstrates how USD appreciation against INR historically compounds foreign equity returns.
-* Direct vs. Feeder Route Guidance (Zero-fee INR Feeder ETFs vs. Direct LRS routes).
+### 6. 🌍 Global Markets & Live USD/INR Portfolio Tracker
+* **INDmoney / Vested / Alpaca US Equity Tracker:** Track fractional US equities (`NVDA`, `MSFT`, `AAPL`, `SPUS`) with live Yahoo Finance USD pricing and real-time `USD/INR` currency appreciation calculations.
 
 ---
 
@@ -67,21 +70,21 @@ An institutional-grade, multi-asset wealth management and algorithmic execution 
 
 | Layer | Component | Description |
 | :--- | :--- | :--- |
-| **Frontend UI** | Streamlit | Responsive, mobile-first Web App with live updates |
-| **Backend Engine** | Python 3.10+ | Multi-threaded background execution worker (`threading`) |
-| **Persistence** | SQLite3 | Embedded ACID database for trades, audit logs, and manual demat sync |
-| **Broker Integration** | Upstox API v2 | Real-time candles, quotes, and portfolio sync via OAuth 2.0 |
-| **Market Data** | Yahoo Finance (`yfinance`) | 5-year historical backtesting and fundamental data retrieval |
+| **Frontend UI** | Streamlit (Cloud) | Multilingual, mobile-first Web App with session-based vault lock |
+| **Backend Engine** | Python 3.10+ | Isolated multi-user background worker threads (`threading`) |
+| **Persistence** | SQLite3 (WAL Mode) | Concurrent ACID database partitioned by `SHA-256` user hashes |
+| **Broker & Alerts** | Upstox / Dhan / Telegram | OAuth 2.0 auto-token exchange & real-time Telegram execution alerts |
+| **Market Data** | Upstox Feed & `yfinance` | Intraday 1-minute candles & live global USD/INR valuation |
 
 ---
 
-## 🚀 Quickstart Guide (Local Setup)
+## 🚀 Quickstart Guide (Cloud & Local Setup)
 
-### Prerequisites
-* Python 3.10 or higher installed with `PATH` enabled.
-* An active Upstox Developer Account (for live API access).
+### Option A: Instant Cloud Access (No Installation Required)
+1. Open the live web application: **[Autonomous Wealth OS on Streamlit](https://my-trading-bot-wyjcnfn2bprzd4ysp8riie.streamlit.app)**
+2. Enter your personal **Secret Passkey** to create or unlock your private encrypted workspace.
 
-### Execution Commands
+### Option B: Local Installation
 
     git clone https://github.com/anasvkvp/my-trading-bot.git
     cd my-trading-bot
@@ -93,9 +96,9 @@ The application will open automatically in your browser at `http://localhost:850
 ---
 
 ## 🔒 Security & Privacy Architecture
-* **Zero Credential Persistence:** API Keys, Access Tokens, and personal client data are never committed to this repository.
-* **Ephemeral In-Memory Handling:** Runtime tokens reside strictly within temporary server RAM sessions and communicate via encrypted HTTPS protocols.
-* **Separation of Concerns:** The open-source code represents pure algorithmic logic and financial formulas; your portfolio balances and private credentials remain strictly confidential.
+* **Zero Credential Exposure:** API Keys, Access Tokens, and personal client data are never committed to this repository.
+* **Cryptographic User Partitioning:** Every user's portfolio, trade history, and OAuth state are isolated via `SHA-256` passkey hashing.
+* **Separation of Concerns:** The open-source repository contains pure algorithmic logic and financial formulas; your portfolio balances and private credentials remain strictly confidential.
 
 ---
 
