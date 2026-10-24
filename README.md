@@ -73,29 +73,14 @@ An institutional-grade, multi-asset wealth management and algorithmic execution 
 * Python 3.10 or higher installed with `PATH` enabled.
 * An active Upstox Developer Account (for live API access).
 
-### 1. Clone the Repository
+### Execution Commands
 ```bash
+# 1. Clone the repository
 git clone https://github.com/anasvkvp/my-trading-bot.git
 cd my-trading-bot
-2. Install Dependencies
-code
-Bash
+
+# 2. Install dependencies
 pip install -r requirements.txt
-3. Launch the Platform
-code
-Bash
+
+# 3. Launch the platform
 streamlit run app.py
-The application will open automatically in your browser at http://localhost:8501.
-🔒 Security & Privacy Architecture
-Zero Credential Persistence: API Keys, Access Tokens, and personal client data are never committed to this repository.
-Ephemeral In-Memory Handling: Runtime tokens reside strictly within temporary server RAM sessions and communicate via encrypted HTTPS protocols.
-Separation of Concerns: The open-source code represents pure algorithmic logic and financial formulas; your portfolio balances and private credentials remain strictly confidential.
-⚖️ Regulatory & Legal Disclaimers (SEBI & Financial Disclosures)
-IMPORTANT NOTICE:
-This software platform is developed strictly for educational, research, and self-directed personal use.
-Non-Advisory Status: The author and contributors are not SEBI-registered Investment Advisers (RIA) or Research Analysts (RA). None of the content, formulas, or curated lists constitute personal financial advice or a solicitation to buy or sell securities.
-Market Risk: Equities, derivatives, and algorithmic trading carry substantial capital risk. Past algorithmic backtest performances do not guarantee future live returns.
-Self-Directed Execution: All trading and investment executions initiated through broker APIs remain entirely at the discretion and sole responsibility of the individual account holder.
-Shariah Verification: While screening rules align with global AAOIFI guidelines, investors are advised to cross-verify compliance based on their individual scholarly guidance.
-📄 License
-This project is open-source and distributed under the MIT License.
