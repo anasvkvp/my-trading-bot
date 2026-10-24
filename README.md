@@ -83,11 +83,13 @@ An institutional-grade, multi-asset wealth management and algorithmic execution 
 
 ### Execution Commands
 
+```markdown
 ```bash
-git clone https://github.com/anasvkvp/my-trading-bot.git
+git clone [https://github.com/anasvkvp/my-trading-bot.git](https://github.com/anasvkvp/my-trading-bot.git)
 cd my-trading-bot
 pip install -r requirements.txt
 streamlit run app.py
+```
 ```
 The application will open automatically in your browser at http://localhost:8501.
 🔒 Security & Privacy Architecture
