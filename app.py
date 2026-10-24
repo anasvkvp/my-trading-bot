@@ -10,10 +10,196 @@ import urllib.parse
 import hashlib
 import yfinance as yf
 
+# ==========================================
+# 🌐 PAGE CONFIGURATION & LANGUAGE DICTIONARY
+# ==========================================
 st.set_page_config(page_title="Autonomous Wealth OS & Algo Bot", layout="wide", page_icon="🏛️")
 
+TRANSLATIONS = {
+    "English": {
+        "login_title": "🔒 Private Vault Login (100% Data Privacy)",
+        "login_desc": "Enter your personal Secret Passkey to unlock your isolated workspace. No other user can view your API keys, trades, or portfolio.",
+        "passkey_label": "Enter Secret Passkey / ID:",
+        "login_btn": "🔓 Unlock Workspace",
+        "logout_btn": "🔒 Logout / Lock Screen",
+        "phil_label": "Investment Philosophy:",
+        "phil_conv": "🌐 Global Conventional Mode",
+        "phil_halal": "🌙 100% Pure Shariah Mode (AAOIFI)",
+        "menu_label": "Select Core Module:",
+        "m1": "⚡ Intraday Algo Trading Bot",
+        "m2": "🎯 Dynamic Goal Allocator",
+        "m3": "💼 Live Portfolio & Exit Watchdog",
+        "m4": "🏛️ 50-Year Moat Stock Vault",
+        "m5": "📈 Mutual Funds & ETFs",
+        "m6": "🌍 Global Markets (US & Currency)",
+        "m7": "🥇 Gold & Crisis Hedge Assets",
+        "m8": "📚 Investment Audit Journal",
+        "bot_title": "⚡ Multi-Broker Institutional Intraday Bot",
+        "bot_sub": "Encrypted User Isolation + Auto OAuth 2.0 + Nifty Trend Guard + 3:15 PM Auto Square-off.",
+        "shariah_warn": "🌙 **Shariah Watchlist Active:** Conventional banks (e.g. SBIN) are excluded. Scanning only AAOIFI-compliant equities (TCS, INFY, SUNPHARMA, RELIANCE).",
+        "token_ready": "✅ **Broker Access Token is Active!** Click **▶️ START BOT** in the sidebar to begin execution.",
+        "oauth_exp": "🔑 1-Click Automatic Token Generator (OAuth 2.0 Setup)",
+        "broker_sel": "🏦 Select Broker Platform:",
+        "ctrl_panel": "⚙️ Bot Control Panel",
+        "mode_label": "Execution Mode:",
+        "mode_paper": "Paper Trading (Safe Simulation)",
+        "mode_live": "Live Real Money",
+        "cap_label": "Trading Capital (₹):",
+        "risk_label": "Risk Per Trade (₹):",
+        "start_btn": "▶️ START BOT",
+        "stop_btn": "⏹️ STOP BOT",
+        "status_col": "Bot Status",
+        "status_run": "🟢 Running on Server",
+        "status_kill": "🛑 Kill Switch Active",
+        "status_off": "🔴 Stopped",
+        "nifty_col": "Nifty 50 Trend",
+        "loss_col": "Consecutive Losses",
+        "cap_col": "Active Capital",
+        "tab_scan": "🔍 Live Scanning Audit Log",
+        "tab_trades": "📜 Executed Trades History",
+        "refresh_btn": "🔄 Refresh Live Status",
+        "wait_scan": "Waiting for live market scan data (Market Window: 9:20 AM - 3:15 PM IST)...",
+        "no_trades": "No trades executed yet in this account."
+    },
+    "മലയാളം": {
+        "login_title": "🔒 സ്വകാര്യ ലോക്കർ ലോഗിൻ (100% Data Privacy)",
+        "login_desc": "നിങ്ങളുടെ സ്വകാര്യ അക്കൗണ്ട് തുറക്കാൻ നിങ്ങൾക്ക് മാത്രം അറിയാവുന്ന ഒരു രഹസ്യ പാസ്‌കീ നൽകുക. നിങ്ങളുടെ ടോക്കണോ ട്രേഡുകളോ മറ്റാർക്കും കാണാൻ കഴിയില്ല.",
+        "passkey_label": "നിങ്ങളുടെ രഹസ്യ പാസ്‌കീ (Secret ID) നൽകുക:",
+        "login_btn": "🔓 അക്കൗണ്ട് തുറക്കുക (Login)",
+        "logout_btn": "🔒 ലോഗൗട്ട് / സ്ക്രീൻ പൂട്ടുക",
+        "phil_label": "നിക്ഷേപ തത്ത്വശാസ്ത്രം (Philosophy):",
+        "phil_conv": "🌐 ആഗോള ജനറൽ മോഡ് (Conventional)",
+        "phil_halal": "🌙 100% പ്യുവർ ശരീഅത്ത് മോഡ് (Halal AAOIFI)",
+        "menu_label": "പ്രധാന വിഭാഗം തിരഞ്ഞെടുക്കുക:",
+        "m1": "⚡ ഇൻട്രാഡേ ട്രേഡിംഗ് ബോട്ട് (Algo Engine)",
+        "m2": "🎯 ലക്ഷ്യാധിഷ്ഠിത പോർട്ട്ഫോളിയോ (Goal Engine)",
+        "m3": "💼 എന്റെ ലൈവ് പോർട്ട്ഫോളിയോ & വാച്ച്ഡോഗ്",
+        "m4": "🏛️ 50-Year Veteran സ്റ്റോക്ക് നിലവറ",
+        "m5": "📈 മ്യൂച്വൽ ഫണ്ടുകൾ & ഇ.ടി.എഫുകൾ",
+        "m6": "🌍 ആഗോള വിപണികൾ (US & INDmoney)",
+        "m7": "🥇 ഗോൾഡ് & സുരക്ഷിത ആസ്തികൾ",
+        "m8": "📚 അഡ്വൈസറി ജേർണൽ & ചേഞ്ച് ലോഗ്",
+        "bot_title": "⚡ മൾട്ടി-ബ്രോക്കർ ഇൻസ്റ്റിറ്റ്യൂഷണൽ ഇൻട്രാഡേ ബോട്ട്",
+        "bot_sub": "100% Encrypted User Isolation + Auto OAuth Token + Nifty Guard + 3:15 PM Auto Square-off.",
+        "shariah_warn": "🌙 **ശരീഅത്ത് വാച്ച്‌ലിസ്റ്റ് ആക്ടീവ്:** ബാങ്കിംഗ് ഓഹരികൾ (SBIN) ഒഴിവാക്കി TCS, INFY, SUNPHARMA, RELIANCE എന്നിവ മാത്രമാണ് സ്കാൻ ചെയ്യുന്നത്.",
+        "token_ready": "✅ **Access Token റെഡിയാണ്!** ഇനി ഇടതുവശത്തെ സൈഡ്‌ബാറിൽ **▶️ START BOT** അമർത്താം.",
+        "oauth_exp": "🔑 ഓട്ടോമാറ്റിക് ടോക്കൺ ജനറേറ്റർ (1-Click Auto Login)",
+        "broker_sel": "🏦 നിങ്ങളുടെ ബ്രോക്കർ പ്ലാറ്റ്‌ഫോം തിരഞ്ഞെടുക്കുക:",
+        "ctrl_panel": "⚙️ ബോട്ട് കൺട്രോൾ പാനൽ",
+        "mode_label": "ട്രേഡിംഗ് മോഡ്:",
+        "mode_paper": "പേപ്പർ ട്രേഡിംഗ് (സുരക്ഷിതം)",
+        "mode_live": "ലൈവ് റിയൽ മണി",
+        "cap_label": "ക്യാപിറ്റൽ (₹):",
+        "risk_label": "ഒരു ട്രേഡിലെ റിസ്ക് (₹):",
+        "start_btn": "▶️ START BOT",
+        "stop_btn": "⏹️ STOP BOT",
+        "status_col": "ബോട്ട് സ്റ്റാറ്റസ്",
+        "status_run": "🟢 സർവറിൽ ഓടുന്നു",
+        "status_kill": "🛑 കിൽ സ്വിച്ച് ഓഫ്",
+        "status_off": "🔴 ഓഫ് ആണ്",
+        "nifty_col": "നിഫ്റ്റി 50 ട്രെൻഡ്",
+        "loss_col": "തുടർച്ചയായ നഷ്ടങ്ങൾ",
+        "cap_col": "ക്യാപിറ്റൽ",
+        "tab_scan": "🔍 എന്റെ ലൈവ് സ്കാനിംഗ് ലോഗ്",
+        "tab_trades": "📜 എന്റെ പൂർത്തിയായ ട്രേഡുകൾ",
+        "refresh_btn": "🔄 സ്റ്റാറ്റസ് റിഫ്രഷ് ചെയ്യുക",
+        "wait_scan": "സ്കാനിംഗ് ഡാറ്റ വരാൻ കാത്തിരിക്കുന്നു (മാർക്കറ്റ് സമയം: 9:20 AM - 3:15 PM IST)...",
+        "no_trades": "ഇതുവരെ ട്രേഡുകൾ ഒന്നും നടന്നിട്ടില്ല."
+    },
+    "हिन्दी": {
+        "login_title": "🔒 प्राइवेट लॉकर लॉगिन (100% डेटा गोपनीयता)",
+        "login_desc": "अपना निजी खाता खोलने के लिए अपना गुप्त पासकी (Secret Passkey) दर्ज करें। आपका डेटा कोई अन्य उपयोगकर्ता नहीं देख सकता।",
+        "passkey_label": "अपना गुप्त पासकी (Secret ID) दर्ज करें:",
+        "login_btn": "🔓 लॉगिन करें (Unlock)",
+        "logout_btn": "🔒 लॉगआउट / लॉक स्क्रीन",
+        "phil_label": "निवेश दर्शन (Philosophy):",
+        "phil_conv": "🌐 ग्लोबल कन्वेंशनल मोड",
+        "phil_halal": "🌙 100% शुद्ध शरीयत मोड (Halal AAOIFI)",
+        "menu_label": "मुख्य विभाग चुनें:",
+        "m1": "⚡ इंट्राडे एल्गो ट्रेडिंग बॉट",
+        "m2": "🎯 गोल पोर्टफोलियो कैलकुलेटर",
+        "m3": "💼 लाइव पोर्टफोलियो और वॉचडॉग",
+        "m4": "🏛️ 50-वर्षीय मोट स्टॉक वॉल्ट",
+        "m5": "📈 म्यूचुअल फंड और ईटीएफ",
+        "m6": "🌍 ग्लोबल मार्केट (US & INDmoney)",
+        "m7": "🥇 गोल्ड और सुरक्षित संपत्ति",
+        "m8": "📚 निवेश ऑडिट जर्नल",
+        "bot_title": "⚡ मल्टी-ब्रोकर इंस्टीट्यूशनल इंट्राडे बॉट",
+        "bot_sub": "Encrypted User Isolation + Auto OAuth Token + Nifty Guard + 3:15 PM Auto Square-off.",
+        "shariah_warn": "🌙 **शरीयत वॉचलिस्ट सक्रिय:** बैंकिंग शेयरों (SBIN) को हटाकर केवल हलाल शेयरों (TCS, INFY, SUNPHARMA, RELIANCE) को स्कैन किया जा रहा है।",
+        "token_ready": "✅ **Access Token तैयार है!** अब साइडबार में **▶️ START BOT** दबाएं।",
+        "oauth_exp": "🔑 ऑटोमैटिक टोकन जनरेटर (1-Click Auto Login)",
+        "broker_sel": "🏦 अपना ब्रोकर प्लेटफॉर्म चुनें:",
+        "ctrl_panel": "⚙️ बॉट कंट्रोल पैनल",
+        "mode_label": "ट्रेडिंग मोड:",
+        "mode_paper": "पेपर ट्रेडिंग (सुरक्षित सिमुलेशन)",
+        "mode_live": "लाइव रियल मनी",
+        "cap_label": "पूंजी / Capital (₹):",
+        "risk_label": "प्रति ट्रेड रिस्क (₹):",
+        "start_btn": "▶️ START BOT",
+        "stop_btn": "⏹️ STOP BOT",
+        "status_col": "बॉट स्टेटस",
+        "status_run": "🟢 सर्वर पर चल रहा है",
+        "status_kill": "🛑 किल स्विच सक्रिय",
+        "status_off": "🔴 बंद है",
+        "nifty_col": "निफ्टी 50 ट्रेंड",
+        "loss_col": "लगातार नुकसान",
+        "cap_col": "सक्रिय पूंजी",
+        "tab_scan": "🔍 लाइव स्कैनिंग लॉग",
+        "tab_trades": "📜 पूरे हुए ट्रेड",
+        "refresh_btn": "🔄 स्टेटस रिफ्रेश करें",
+        "wait_scan": "स्कैनिंग डेटा की प्रतीक्षा है (बाजार समय: 9:20 AM - 3:15 PM IST)...",
+        "no_trades": "अभी तक कोई ट्रेड नहीं हुआ है।"
+    },
+    "العربية": {
+        "login_title": "🔒 تسجيل الدخول الآمن (خصوصية 100%)",
+        "login_desc": "أدخل مفتاح المرور السري الخاص بك لفتح مساحتك الخاصة. لا يمكن لأي مستخدم آخر رؤية بياناتك.",
+        "passkey_label": "أدخل الرقم السري (Secret Passkey):",
+        "login_btn": "🔓 فتح الحساب",
+        "logout_btn": "🔒 تسجيل الخروج / قفل",
+        "phil_label": "فلسفة الاستثمار:",
+        "phil_conv": "🌐 الوضع العالمي التقليدي",
+        "phil_halal": "🌙 الوضع الشرعي النقي 100% (AAOIFI)",
+        "menu_label": "اختر القسم الرئيسي:",
+        "m1": "⚡ روبوت التداول اللحظي (Algo Bot)",
+        "m2": "🎯 محرك الأهداف المالية",
+        "m3": "💼 المحفظة الحية ومراقب الخروج",
+        "m4": "🏛️ خزنة الأسهم الاستراتيجية",
+        "m5": "📈 الصناديق المتداولة (ETFs)",
+        "m6": "🌍 الأسواق العالمية (الأسهم الأمريكية)",
+        "m7": "🥇 الذهب والأصول الآمنة",
+        "m8": "📚 سجل قرارات الاستثمار",
+        "bot_title": "⚡ روبوت التداول المؤسسي متعدد الوسطاء",
+        "bot_sub": "عزل مشفر للمستخدمين + توليد تلقائي للتوكن + حماية المؤشر + إغلاق تلقائي 3:15 مساءً.",
+        "shariah_warn": "🌙 **القائمة الشرعية نشطة:** تم استبعاد البنوك الربوية، ويتم فحص الأسهم المتوافقة مع الشريعة فقط.",
+        "token_ready": "✅ **رمز الوصول جاهز!** اضغط على **▶️ START BOT** في القائمة الجانبية.",
+        "oauth_exp": "🔑 مولد التوكن التلقائي (1-Click Auto Login)",
+        "broker_sel": "🏦 اختر منصة الوسيط:",
+        "ctrl_panel": "⚙️ لوحة التحكم بالروبوت",
+        "mode_label": "وضع التداول:",
+        "mode_paper": "تداول افتراضي آمن (Paper Trading)",
+        "mode_live": "تداول بأموال حقيقية (Live)",
+        "cap_label": "رأس المال (₹):",
+        "risk_label": "المخاطرة لكل صفقة (₹):",
+        "start_btn": "▶️ START BOT",
+        "stop_btn": "⏹️ STOP BOT",
+        "status_col": "حالة الروبوت",
+        "status_run": "🟢 يعمل في الخادم",
+        "status_kill": "🛑 توقف الطوارئ",
+        "status_off": "🔴 متوقف",
+        "nifty_col": "اتجاه مؤشر Nifty 50",
+        "loss_col": "الخسائر المتتالية",
+        "cap_col": "رأس المال",
+        "tab_scan": "🔍 سجل الفحص المباشر",
+        "tab_trades": "📜 الصفقات المنفذة",
+        "refresh_btn": "🔄 تحديث الحالة",
+        "wait_scan": "بانتظار بيانات السوق المباشرة (9:20 صباحاً - 3:15 مساءً)...",
+        "no_trades": "لم يتم تنفيذ أي صفقات حتى الآن."
+    }
+}
+
 # ==========================================
-# 🗄️ മൾട്ടി-യൂസർ & മൾട്ടി-ബ്രോക്കർ ഡാറ്റാബേസ് സെറ്റപ്പ്
+# 🗄️ MULTI-USER SQLITE DATABASE SETUP (WAL MODE)
 # ==========================================
 DB_NAME = "trading_journal_v3.db"
 
@@ -112,7 +298,7 @@ def exchange_code_for_token(auth_code, api_k, api_s, red_u):
         return False, str(e)
 
 # ==========================================
-# 🔐 സുരക്ഷിതമായ OAuth State Token Matcher (100% Private)
+# 🔐 OAUTH STATE MATCHER & SESSION AUTHENTICATION
 # ==========================================
 @st.cache_resource
 def get_user_vault():
@@ -120,7 +306,12 @@ def get_user_vault():
 
 user_vault = get_user_vault()
 
-# Upstox-ൽ നിന്ന് തിരികെ വരുമ്പോൾ ആ യൂസറുടെ സ്വന്തം USER_HASH (state) വെച്ച് മാത്രം ടോക്കൺ മാച്ച് ചെയ്യുന്നു!
+# Sidebar Language Selector
+st.sidebar.markdown("# 🏛️ WEALTH OS")
+lang = st.sidebar.selectbox("🌐 Language / ഭാഷ / भाषा / اللغة:", ["English", "മലയാളം", "हिन्दी", "العربية"], index=0)
+T = TRANSLATIONS[lang]
+
+# Handle incoming OAuth 2.0 callback securely via encrypted state parameter
 if "code" in st.query_params:
     incoming_code = st.query_params["code"]
     incoming_state_hash = st.query_params.get("state", "")
@@ -134,34 +325,44 @@ if "code" in st.query_params:
                 save_user_creds(incoming_state_hash, u_creds['api_key'], u_creds['api_secret'], u_creds['redirect_uri'], u_creds['tg_token'], u_creds['tg_chat'], tok_or_err, u_creds['broker'])
                 if incoming_state_hash in user_vault:
                     user_vault[incoming_state_hash]['token'] = tok_or_err
-                st.success("🔒 **നിങ്ങളുടെ സ്വകാര്യ Upstox Access Token സുരക്ഷിതമായി ജനറേറ്റ് ചെയ്ത് സേവ് ചെയ്തു!** ഇടതുവശത്ത് നിങ്ങളുടെ പാസ്‌കീ നൽകിയാൽ ബോട്ട് സ്റ്റാർട്ട് ചെയ്യാം.")
+                st.session_state["authenticated_user_hash"] = incoming_state_hash
+                st.success("🎉 OAuth 2.0 Access Token generated and securely saved to your vault!")
             else:
-                st.error(f"Token Error: {tok_or_err}")
+                st.error(f"OAuth Token Error: {tok_or_err}")
     else:
         st.session_state["pending_auth_code"] = incoming_code
 
-st.sidebar.markdown("# 🏛️ WEALTH OS")
+# Session-based Login / Logout System (Fixes the Logout button issue completely)
+if "authenticated_user_hash" not in st.session_state:
+    st.session_state["authenticated_user_hash"] = None
 
-user_passkey = st.sidebar.text_input(
-    "🔐 നിങ്ങളുടെ സ്വകാര്യ പാസ്‌കീ (Secret ID):",
-    type="password",
-    help="ഇതൊരു പബ്ലിക് മൾട്ടി-യൂസർ ആപ്പാണ്. നിങ്ങൾക്ക് മാത്രം അറിയാവുന്ന ഒരു രഹസ്യ പാസ്‌വേഡ് നൽകുക. നിങ്ങളുടെ ഡാറ്റ മറ്റാർക്കും കാണാൻ കഴിയില്ല."
-)
-
-if not user_passkey:
-    st.info("🌐 **പബ്ലിക് മൾട്ടി-യൂസർ പ്ലാറ്റ്‌ഫോം (100% Data Privacy):** ഈ ആപ്പ് ആർക്കും സൗജന്യമായി ഉപയോഗിക്കാം! ഇടതുവശത്തെ സൈഡ്‌ബാറിൽ നിങ്ങൾക്ക് ഇഷ്ടമുള്ള ഒരു **രഹസ്യ പാസ്‌കീ (Secret ID)** നൽകിയാൽ നിങ്ങളുടെ സ്വന്തം സ്വകാര്യ അക്കൗണ്ട് തുറക്കപ്പെടും. ഒരാളുടെ API Key-യോ പോർട്ട്ഫോളിയോയോ മറ്റൊരാൾക്ക് ഒരിക്കലും കാണാൻ കഴിയില്ല.")
+if not st.session_state["authenticated_user_hash"]:
+    st.subheader(T["login_title"])
+    st.info(T["login_desc"])
+    with st.form("vault_login_form"):
+        passkey_input = st.text_input(T["passkey_label"], type="password")
+        login_submitted = st.form_submit_button(T["login_btn"], type="primary")
+        if login_submitted and passkey_input.strip():
+            st.session_state["authenticated_user_hash"] = hashlib.sha256(passkey_input.strip().encode()).hexdigest()[:16]
+            st.rerun()
     st.stop()
 
-USER_HASH = hashlib.sha256(user_passkey.strip().encode()).hexdigest()[:16]
+USER_HASH = st.session_state["authenticated_user_hash"]
+
+# Working Logout Button in Sidebar
+if st.sidebar.button(T["logout_btn"], use_container_width=True):
+    st.session_state["authenticated_user_hash"] = None
+    st.rerun()
+
 saved_c = load_user_creds(USER_HASH) or {}
 
 if USER_HASH not in user_vault:
     user_vault[USER_HASH] = {
         'running': False, 'token': saved_c.get('access_token', ''), 'capital': 5000.0, 'risk': 100.0,
-        'mode': 'പേപ്പർ ട്രേഡിംഗ് (സുരക്ഷിതം)',
+        'mode': 'PAPER',
         'tg_token': saved_c.get('tg_token', ''), 'tg_chat': saved_c.get('tg_chat', ''),
         'thread': None, 'consecutive_losses': 0, 'kill_switch': False,
-        'nifty_status': 'പരിശോധിക്കുന്നു...', 'active_pos': None,
+        'nifty_status': 'Checking...', 'active_pos': None,
         'shariah_lock': False, 'last_order_error': '',
         'api_key': saved_c.get('api_key', ''),
         'api_secret': saved_c.get('api_secret', ''),
@@ -174,33 +375,17 @@ else:
 
 state = user_vault[USER_HASH]
 
-if st.sidebar.button("🔒 ലോഗൗട്ട് / ലോക്ക് സ്ക്രീൻ", use_container_width=True):
-    st.rerun()
-
 # ==========================================
-# 👑 മാസ്റ്റർ ഗ്ലോബൽ സ്വിച്ച്
+# 👑 MASTER PHILOSOPHY & NAVIGATION MENU
 # ==========================================
-wealth_mode = st.sidebar.radio(
-    "നിക്ഷേപ തത്ത്വശാസ്ത്രം (Philosophy):",
-    ["🌐 ആഗോള ജനറൽ മോഡ് (Global Conventional)", "🌙 100% പ്യുവർ ശരീഅത്ത് മോഡ് (Pure Halal AAOIFI)"]
-)
-is_shariah = "ശരീഅത്ത്" in wealth_mode
+st.sidebar.markdown("---")
+wealth_mode = st.sidebar.radio(T["phil_label"], [T["phil_conv"], T["phil_halal"]])
+is_shariah = (wealth_mode == T["phil_halal"])
 state['shariah_lock'] = is_shariah
 
 st.sidebar.markdown("---")
-main_menu = st.sidebar.radio(
-    "പ്രധാന വിഭാഗം തിരഞ്ഞെടുക്കുക:",
-    [
-        "⚡ ഇൻട്രാഡേ ട്രേഡിംഗ് ബോട്ട് (Multi-Broker Engine)",
-        "🎯 ലക്ഷ്യാധിഷ്ഠിത പോർട്ട്ഫോളിയോ (Goal Engine)",
-        "💼 എന്റെ ലൈവ് പോർട്ട്ഫോളിയോ (All Brokers Sync)",
-        "🏛️ 50-Year Veteran സ്റ്റോക്ക് നിലവറ (Why Buy & Exit Rules)",
-        "📈 മ്യൂച്വൽ ഫണ്ടുകൾ & ഇ.ടി.എഫുകൾ",
-        "🌍 ആഗോള വിപണികൾ (INDmoney / US Live Tracker)",
-        "🥇 ഗോൾഡ് & സുരക്ഷിത ആസ്തികൾ",
-        "📚 അഡ്വൈസറി ജേർണൽ & ചേഞ്ച് ലോഗ്"
-    ]
-)
+menu_options = [T["m1"], T["m2"], T["m3"], T["m4"], T["m5"], T["m6"], T["m7"], T["m8"]]
+main_menu = st.sidebar.radio(T["menu_label"], menu_options)
 
 WATCHLIST_CONVENTIONAL = {
     'SBIN': 'NSE_EQ|INE062A01020',
@@ -219,27 +404,27 @@ WATCHLIST_SHARIAH = {
 NIFTY_KEY = 'NSE_INDEX|Nifty 50'
 
 # ##################################################################
-# ⚡ വിഭാഗം 1: ഇൻട്രാഡേ ട്രേഡിംഗ് ബോട്ട് (Multi-Broker)
+# ⚡ MODULE 1: INTRADAY ALGO TRADING BOT
 # ##################################################################
-if main_menu == "⚡ ഇൻട്രാഡേ ട്രേഡിംഗ് ബോട്ട് (Multi-Broker Engine)":
-    st.title("⚡ മൾട്ടി-ബ്രോക്കർ ഇൻസ്റ്റിറ്റ്യൂഷണൽ ഇൻട്രാഡേ ബോട്ട്")
-    st.caption("100% Encrypted User Isolation + Upstox / Dhan / Zerodha / AngelOne Support + 3:15 PM Auto Square-off.")
+if main_menu == T["m1"]:
+    st.title(T["bot_title"])
+    st.caption(T["bot_sub"])
 
     selected_broker = st.selectbox(
-        "🏦 നിങ്ങളുടെ ബ്രോക്കർ പ്ലാറ്റ്‌ഫോം തിരഞ്ഞെടുക്കുക:",
+        T["broker_sel"],
         ["Upstox (API v2)", "Dhan (DhanHQ API)", "Zerodha (Kite Connect)", "Angel One (SmartAPI)"],
         index=0
     )
     state['broker'] = selected_broker.split(" ")[0]
 
     if is_shariah:
-        st.warning("🌙 **ശരീഅത്ത് വാച്ച്‌ലിസ്റ്റ് ആക്ടീവ്:** ബാങ്കിംഗ് ഓഹരികൾ (SBIN) ഒഴിവാക്കി TCS, INFY, SUNPHARMA, RELIANCE എന്നിവ മാത്രമാണ് സ്കാൻ ചെയ്യുന്നത്.")
+        st.warning(T["shariah_warn"])
 
     if state['token']:
-        st.success(f"✅ **{state['broker']} Access Token റെഡിയാണ്!** ഇനി ഇടതുവശത്തെ സൈഡ്‌ബാറിൽ **▶️ START BOT** അമർത്താം.")
+        st.success(T["token_ready"])
 
-    with st.expander(f"🔑 {state['broker']} ഓട്ടോമാറ്റിക് ടോക്കൺ & API സെറ്റപ്പ് (100% Encrypted)", expanded=not bool(state['token'])):
-        st.caption("🔒 സുരക്ഷാ ഉറപ്പ്: ഇവിടെ നൽകുന്ന API വിവരങ്ങൾ നിങ്ങളുടെ രഹസ്യ പാസ്‌കീയിൽ എൻക്രിപ്റ്റ് ചെയ്യപ്പെട്ടിരിക്കുന്നു. മറ്റാർക്കും ഇത് കാണാൻ കഴിയില്ല.")
+    with st.expander(T["oauth_exp"], expanded=not bool(state['token'])):
+        st.caption("🔒 Your API credentials are encrypted under your personal Passkey hash.")
         oa1, oa2, oa3 = st.columns(3)
         api_k = oa1.text_input(f"{state['broker']} API Key / Client ID:", value=state['api_key'], type="password")
         api_s = oa2.text_input(f"{state['broker']} API Secret:", value=state['api_secret'], type="password")
@@ -252,14 +437,13 @@ if main_menu == "⚡ ഇൻട്രാഡേ ട്രേഡിംഗ് ബോ
         if state['broker'] == "Upstox" and state['api_key'] and state['api_secret'] and state['redirect_uri']:
             save_user_creds(USER_HASH, state['api_key'], state['api_secret'], state['redirect_uri'], state['tg_token'], state['tg_chat'], state['token'], state['broker'])
             encoded_redir = urllib.parse.quote(state['redirect_uri'], safe='')
-            # state=USER_HASH ചേർത്തതിനാൽ ലോഗിൻ ചെയ്യുമ്പോൾ ഈ യൂസറുടെ അക്കൗണ്ടിലേക്ക് മാത്രമേ ടോക്കൺ കയറൂ!
             auth_url = f"https://api.upstox.com/v2/login/authorization/dialog?response_type=code&client_id={state['api_key']}&redirect_uri={encoded_redir}&state={USER_HASH}"
-            st.link_button("🚀 Step 1: ഇവിടെ ക്ലിക്ക് ചെയ്ത് Upstox-ൽ നിന്ന് ഓട്ടോമാറ്റിക് ടോക്കൺ എടുക്കുക", auth_url, type="primary")
+            st.link_button("🚀 Step 1: 1-Click Auto Login with Upstox", auth_url, type="primary")
         elif state['broker'] != "Upstox":
-            st.info(f"💡 **{state['broker']}** തിരഞ്ഞെടുത്തു: നിങ്ങളുടെ {state['broker']} ഡെവലപ്പർ കൺസോളിൽ നിന്നുള്ള Access Token താഴെ ഇടതുവശത്തെ സൈഡ്‌ബാറിൽ പേസ്റ്റ് ചെയ്ത് ബോട്ട് സ്റ്റാർട്ട് ചെയ്യാം.")
+            st.info(f"💡 Paste your {state['broker']} Access Token in the sidebar to begin execution.")
 
         with st.form("manual_code_form"):
-            manual_code = st.text_input("അല്ലെങ്കിൽ URL-ൽ വരുന്ന 'code=' ഇവിടെ പേസ്റ്റ് ചെയ്യുക:")
+            manual_code = st.text_input("Or paste the 'code=' parameter from callback URL:")
             submitted = st.form_submit_button("⚡ Generate Token Now")
             if submitted and manual_code:
                 clean_code = manual_code.strip()
@@ -269,18 +453,18 @@ if main_menu == "⚡ ഇൻട്രാഡേ ട്രേഡിംഗ് ബോ
                 if ok:
                     state['token'] = res_msg
                     save_user_creds(USER_HASH, state['api_key'], state['api_secret'], state['redirect_uri'], state['tg_token'], state['tg_chat'], res_msg, state['broker'])
-                    st.success("🎉 ടോക്കൺ ഓട്ടോമാറ്റിക് ആയി ജനറേറ്റ് ചെയ്ത് സേവ് ചെയ്തു!")
+                    st.success("🎉 Token generated and saved!")
                     time.sleep(1)
                     st.rerun()
                 else:
                     st.error(f"❌ Error: {res_msg}")
 
     st.sidebar.markdown("---")
-    st.sidebar.subheader("⚙️ ബോട്ട് കൺട്രോൾ പാനൽ")
-    mode_input = st.sidebar.radio("ട്രേഡിംഗ് മോഡ്:", ["പേപ്പർ ട്രേഡിംഗ് (സുരക്ഷിതം)", "ലൈവ് റിയൽ മണി"], index=0 if "പേപ്പർ" in state['mode'] else 1)
+    st.sidebar.subheader(T["ctrl_panel"])
+    mode_choice = st.sidebar.radio(T["mode_label"], [T["mode_paper"], T["mode_live"]], index=0 if state['mode'] == "PAPER" else 1)
     token_input = st.sidebar.text_input(f"{state['broker']} Access Token:", value=state['token'], type="password")
-    capital_input = st.sidebar.number_input("ക്യാപിറ്റൽ (₹):", value=float(state['capital']), min_value=500.0, step=500.0)
-    risk_input = st.sidebar.number_input("ഒരു ട്രേഡിലെ റിസ്ക് (₹):", value=float(state['risk']), min_value=10.0, step=25.0)
+    capital_input = st.sidebar.number_input(T["cap_label"], value=float(state['capital']), min_value=500.0, step=500.0)
+    risk_input = st.sidebar.number_input(T["risk_label"], value=float(state['risk']), min_value=10.0, step=25.0)
 
     tg_token_input = st.sidebar.text_input("Telegram Bot Token (Optional):", value=state['tg_token'], type="password")
     tg_chat_input = st.sidebar.text_input("Telegram Chat ID (Optional):", value=state['tg_chat'])
@@ -293,7 +477,7 @@ if main_menu == "⚡ ഇൻട്രാഡേ ട്രേഡിംഗ് ബോ
                 pass
 
     def place_real_order(symbol, instrument_key, qty, action, token, u_state):
-        if "ലൈവ് റിയൽ" in u_state['mode']:
+        if u_state['mode'] == "LIVE":
             broker_name = u_state.get('broker', 'Upstox')
             try:
                 if broker_name == "Upstox":
@@ -311,7 +495,7 @@ if main_menu == "⚡ ഇൻട്രാഡേ ട്രേഡിംഗ് ബോ
                         u_state['last_order_error'] = ''
                         return True
                     else:
-                        err_msg = res_json.get('errors', [{}])[0].get('message', 'Order Error')
+                        err_msg = res_json.get('errors', [{}])[0].get('message', 'Order Rejected')
                         u_state['last_order_error'] = f"Order Failed ({symbol}): {err_msg}"
                         return False
                 elif broker_name == "Dhan":
@@ -360,9 +544,9 @@ if main_menu == "⚡ ഇൻട്രാഡേ ട്രേഡിംഗ് ബോ
             close = df['close'].astype(float)
             ema_20 = close.ewm(span=20, adjust=False).mean()
             is_bullish = close.iloc[-1] >= ema_20.iloc[-1]
-            u_state['nifty_status'] = "🟢 ബുള്ളിഷ് (Positive)" if is_bullish else "🔴 ബെയറിഷ് (Negative)"
+            u_state['nifty_status'] = "🟢 Bullish (Above EMA20)" if is_bullish else "🔴 Bearish (Below EMA20)"
             return is_bullish
-        u_state['nifty_status'] = "⚠️ ഡാറ്റ ലഭ്യമല്ല (Waiting)"
+        u_state['nifty_status'] = "⚠️ Waiting for Feed"
         return False
 
     def calculate_indicators(df):
@@ -412,6 +596,7 @@ if main_menu == "⚡ ഇൻട്രാഡേ ട്രേഡിംഗ് ബോ
             market_entry_cutoff = datetime.time(15, 5)
             market_close_time = datetime.time(15, 15)
 
+            # 3:15 PM Auto Square-off Enforcement
             if curr_time_obj >= market_close_time:
                 if u_state['active_pos']:
                     pos = u_state['active_pos']
@@ -420,18 +605,20 @@ if main_menu == "⚡ ഇൻട്രാഡേ ട്രേഡിംഗ് ബോ
                     if place_real_order(pos['symbol'], pos['key'], pos['qty'], "SELL", token, u_state):
                         pnl = (exit_p - pos['buy_price']) * pos['qty']
                         log_trade(u_hash, now_ist.strftime("%Y-%m-%d"), now_ist.strftime("%I:%M:%S %p"), pos['symbol'], "AUTO_315_EXIT", pos['buy_price'], exit_p, pos['qty'], pnl)
-                        send_telegram(f"⏰ *3:15 PM ഓട്ടോ സ്ക്വയർ-ഓഫ്:* `{pos['symbol']}` ക്ലോസ് ചെയ്തു. PnL: `₹{pnl:.2f}`", u_state['tg_token'], u_state['tg_chat'])
+                        send_telegram(f"⏰ *3:15 PM Auto Square-off:* `{pos['symbol']}` closed. PnL: `₹{pnl:.2f}`", u_state['tg_token'], u_state['tg_chat'])
                         u_state['active_pos'] = None
-                u_state['nifty_status'] = "🌙 മാർക്കറ്റ് ക്ലോസ് ആയി (After 3:15 PM)"
+                u_state['nifty_status'] = "🌙 Market Closed (After 3:15 PM)"
                 time.sleep(15)
                 continue
 
+            # Consecutive Loss Circuit Breaker (Kill Switch)
             if u_state['consecutive_losses'] >= 2:
                 u_state['kill_switch'] = True
                 u_state['running'] = False
-                send_telegram("🛑 *കിൽ സ്വിച്ച് ആക്റ്റീവ് ആയി!* തുടർച്ചയായി 2 നഷ്ടങ്ങൾ വന്നതിനാൽ ട്രേഡിംഗ് പൂർണ്ണമായി നിർത്തി.", u_state['tg_token'], u_state['tg_chat'])
+                send_telegram("🛑 *Kill Switch Activated!* Trading halted after 2 consecutive stop-losses.", u_state['tg_token'], u_state['tg_chat'])
                 break
 
+            # Active Position Monitoring
             if u_state['active_pos']:
                 pos = u_state['active_pos']
                 df_cur = fetch_candles(pos['key'], token)
@@ -443,20 +630,20 @@ if main_menu == "⚡ ഇൻട്രാഡേ ട്രേഡിംഗ് ബോ
                         if place_real_order(pos['symbol'], pos['key'], pos['qty'], "SELL", token, u_state):
                             pnl = (cur_p - pos['buy_price']) * pos['qty']
                             log_trade(u_hash, now_ist.strftime("%Y-%m-%d"), now_ist.strftime("%I:%M:%S %p"), pos['symbol'], "TIME_EXIT_45M", pos['buy_price'], cur_p, pos['qty'], pnl)
-                            send_telegram(f"⏳ *45m Stale Momentum Exit:* `{pos['symbol']}` ഒഴിവാക്കി. PnL: `₹{pnl:.2f}`", u_state['tg_token'], u_state['tg_chat'])
+                            send_telegram(f"⏳ *45m Stale Momentum Exit:* `{pos['symbol']}` closed. PnL: `₹{pnl:.2f}`", u_state['tg_token'], u_state['tg_chat'])
                             u_state['active_pos'] = None
                     elif cur_p >= pos['target']:
                         if place_real_order(pos['symbol'], pos['key'], pos['qty'], "SELL", token, u_state):
                             pnl = (cur_p - pos['buy_price']) * pos['qty']
                             log_trade(u_hash, now_ist.strftime("%Y-%m-%d"), now_ist.strftime("%I:%M:%S %p"), pos['symbol'], "TARGET_HIT", pos['buy_price'], cur_p, pos['qty'], pnl)
-                            send_telegram(f"🎉 *TARGET HIT:* `{pos['symbol']}` ലാഭം: `+₹{pnl:.2f}`", u_state['tg_token'], u_state['tg_chat'])
+                            send_telegram(f"🎉 *TARGET HIT:* `{pos['symbol']}` Profit: `+₹{pnl:.2f}`", u_state['tg_token'], u_state['tg_chat'])
                             u_state['consecutive_losses'] = 0
                             u_state['active_pos'] = None
                     elif cur_p <= pos['sl']:
                         if place_real_order(pos['symbol'], pos['key'], pos['qty'], "SELL", token, u_state):
                             pnl = (cur_p - pos['buy_price']) * pos['qty']
                             log_trade(u_hash, now_ist.strftime("%Y-%m-%d"), now_ist.strftime("%I:%M:%S %p"), pos['symbol'], "STOP_LOSS", pos['buy_price'], cur_p, pos['qty'], pnl)
-                            send_telegram(f"🛑 *STOP LOSS HIT:* `{pos['symbol']}` നഷ്ടം: `₹{pnl:.2f}`", u_state['tg_token'], u_state['tg_chat'])
+                            send_telegram(f"🛑 *STOP LOSS HIT:* `{pos['symbol']}` Loss: `₹{pnl:.2f}`", u_state['tg_token'], u_state['tg_chat'])
                             u_state['consecutive_losses'] += 1
                             u_state['active_pos'] = None
 
@@ -465,9 +652,9 @@ if main_menu == "⚡ ഇൻട്രാഡേ ട്രേഡിംഗ് ബോ
 
             if not is_trading_window:
                 if not is_weekday:
-                    u_state['nifty_status'] = "📅 അവധി ദിവസമാണ് (Weekend)"
+                    u_state['nifty_status'] = "📅 Market Holiday (Weekend)"
                 elif curr_time_obj < market_entry_start:
-                    u_state['nifty_status'] = "⏳ 9:20 AM ആകാൻ കാത്തിരിക്കുന്നു..."
+                    u_state['nifty_status'] = "⏳ Waiting for 9:20 AM IST..."
                 time.sleep(10)
                 continue
 
@@ -499,15 +686,15 @@ if main_menu == "⚡ ഇൻട്രാഡേ ട്രേഡിംഗ് ബോ
                     curr_time = now_ist.strftime("%I:%M:%S %p")
 
                     if not nifty_ok:
-                        reason, status = "നിഫ്റ്റി ഇൻഡക്സ് ബുള്ളിഷ് അല്ല", "SKIPPED_NIFTY"
+                        reason, status = "Nifty 50 Trend Bearish", "SKIPPED_NIFTY"
                     elif not above_vwap:
-                        reason, status = "VWAP-ക്ക് താഴെയാണ് (Bearish)", "SKIPPED"
+                        reason, status = "Price Below VWAP", "SKIPPED"
                     elif not volume_surge:
-                        reason, status = "വോളിയം കുറവാണ്", "SKIPPED"
+                        reason, status = "Low Volume (<1.2x SMA)", "SKIPPED"
                     elif not rsi_safe:
-                        reason, status = f"RSI അനുകൂലമല്ല ({rsi:.1f})", "SKIPPED"
+                        reason, status = f"RSI Out of Range ({rsi:.1f})", "SKIPPED"
                     elif not ema_cross:
-                        reason, status = "EMA ക്രോസ് ആയിട്ടില്ല", "WAITING"
+                        reason, status = "Awaiting EMA 9/21 Crossover", "WAITING"
                     else:
                         sl_dist = max(0.5, 1.5 * atr)
                         sl_p = curr_price - sl_dist
@@ -518,16 +705,16 @@ if main_menu == "⚡ ഇൻട്രാഡേ ട്രേഡിംഗ് ബോ
                         qty = max(1, min(risk_based_qty, max_affordable_qty))
 
                         if curr_price > u_state['capital']:
-                            reason, status = f"ക്യാപിറ്റൽ തികയില്ല (വില: ₹{curr_price:.0f})", "SKIPPED_CAP"
+                            reason, status = f"Insufficient Capital (Price: ₹{curr_price:.0f})", "SKIPPED_CAP"
                         elif place_real_order(symbol, instrument_key, qty, "BUY", token, u_state):
                             u_state['active_pos'] = {
                                 'symbol': symbol, 'key': instrument_key, 'buy_price': curr_price,
                                 'qty': qty, 'sl': sl_p, 'target': tg_p, 'entry_time': time.time()
                             }
-                            reason, status = f"വാങ്ങി (Qty: {qty})", "🎯 BUY TRIGGERED"
-                            send_telegram(f"🚀 *BUY എടുത്തു:* `{symbol}` (Qty: {qty}) @ ₹{curr_price:.2f} | Target: ₹{tg_p:.2f} | SL: ₹{sl_p:.2f}", u_state['tg_token'], u_state['tg_chat'])
+                            reason, status = f"Executed BUY (Qty: {qty})", "🎯 BUY_TRIGGERED"
+                            send_telegram(f"🚀 *BUY EXECUTED:* `{symbol}` (Qty: {qty}) @ ₹{curr_price:.2f} | Target: ₹{tg_p:.2f} | SL: ₹{sl_p:.2f}", u_state['tg_token'], u_state['tg_chat'])
                         else:
-                            reason, status = "ബ്രോക്കർ ഓർഡർ തള്ളി", "ORDER_FAILED"
+                            reason, status = "Broker Rejected Order", "ORDER_FAILED"
 
                     try:
                         conn = get_db_connection()
@@ -547,14 +734,14 @@ if main_menu == "⚡ ഇൻട്രാഡേ ട്രേഡിംഗ് ബോ
             time.sleep(10)
 
     col1, col2 = st.sidebar.columns(2)
-    if col1.button("▶️ START BOT", use_container_width=True):
+    if col1.button(T["start_btn"], use_container_width=True):
         if not token_input:
-            st.sidebar.error("Access Token നൽകുക!")
+            st.sidebar.error("Please provide Broker Access Token!")
         else:
             state['token'] = token_input
             state['capital'] = capital_input
             state['risk'] = risk_input
-            state['mode'] = mode_input
+            state['mode'] = "PAPER" if mode_choice == T["mode_paper"] else "LIVE"
             state['tg_token'] = tg_token_input
             state['tg_chat'] = tg_chat_input
             save_user_creds(USER_HASH, state['api_key'], state['api_secret'], state['redirect_uri'], state['tg_token'], state['tg_chat'], state['token'], state['broker'])
@@ -565,40 +752,40 @@ if main_menu == "⚡ ഇൻട്രാഡേ ട്രേഡിംഗ് ബോ
                 t = threading.Thread(target=background_trading_loop, args=(USER_HASH, state), daemon=True)
                 t.start()
                 state['thread'] = t
-            st.sidebar.success("നിങ്ങളുടെ സ്വകാര്യ ബോട്ട് സജീവം!")
+            st.sidebar.success("Bot Started!")
 
-    if col2.button("⏹️ STOP BOT", use_container_width=True):
+    if col2.button(T["stop_btn"], use_container_width=True):
         state['running'] = False
-        st.sidebar.warning("ബോട്ട് നിർത്തി!")
+        st.sidebar.warning("Bot Stopped!")
 
     if state['last_order_error']:
-        st.error(f"🚨 ബ്രോക്കർ മുന്നറിയിപ്പ്: {state['last_order_error']}")
+        st.error(f"🚨 Broker Alert: {state['last_order_error']}")
 
     m1, m2, m3, m4 = st.columns(4)
-    m1.metric("ബോട്ട് സ്റ്റാറ്റസ്", "🟢 സർവറിൽ ഓടുന്നു" if state['running'] else ("🛑 കിൽ സ്വിച്ച് ഓഫ്" if state['kill_switch'] else "🔴 ഓഫ് ആണ്"))
-    m2.metric("നിഫ്റ്റി 50 ട്രെൻഡ്", state['nifty_status'])
-    m3.metric("തുടർച്ചയായ നഷ്ടങ്ങൾ", f"{state['consecutive_losses']} / 2")
-    m4.metric("ക്യാപിറ്റൽ", f"₹{state['capital']:,.2f}")
+    m1.metric(T["status_col"], T["status_run"] if state['running'] else (T["status_kill"] if state['kill_switch'] else T["status_off"]))
+    m2.metric(T["nifty_col"], state['nifty_status'])
+    m3.metric(T["loss_col"], f"{state['consecutive_losses']} / 2")
+    m4.metric(T["cap_col"], f"₹{state['capital']:,.2f}")
 
     if state['active_pos']:
         ap = state['active_pos']
-        st.success(f"📌 **നിലവിലെ ലൈവ് ട്രേഡ്:** `{ap['symbol']}` | എണ്ണം: `{ap['qty']}` | വാങ്ങിയ വില: `₹{ap['buy_price']:.2f}` | ടാർജറ്റ്: `₹{ap['target']:.2f}` | സ്റ്റോപ്പ്-ലോസ്: `₹{ap['sl']:.2f}`")
+        st.success(f"📌 **Active Position:** `{ap['symbol']}` | Qty: `{ap['qty']}` | Buy: `₹{ap['buy_price']:.2f}` | Target: `₹{ap['target']:.2f}` | SL: `₹{ap['sl']:.2f}`")
 
     st.divider()
 
-    t1, t2 = st.tabs(["🔍 എന്റെ ലൈവ് സ്കാനിംഗ് ലോഗ്", "📜 എന്റെ പൂർത്തിയായ ട്രേഡുകൾ"])
+    t1, t2 = st.tabs([T["tab_scan"], T["tab_trades"]])
     with t1:
         try:
             conn = get_db_connection()
             today_str = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=5, minutes=30))).strftime("%Y-%m-%d")
-            df_live = pd.read_sql_query("SELECT time AS Time, symbol AS Stock, price AS Price, vwap AS VWAP, rsi AS RSI, nifty_trend AS [Nifty Sentiment], status AS Status, reason AS Reason FROM audit_logs WHERE user_hash=? AND date=? ORDER BY id DESC LIMIT 50", conn, params=(USER_HASH, today_str))
+            df_live = pd.read_sql_query("SELECT time AS Time, symbol AS Stock, price AS Price, vwap AS VWAP, rsi AS RSI, nifty_trend AS [Nifty Trend], status AS Status, reason AS Reason FROM audit_logs WHERE user_hash=? AND date=? ORDER BY id DESC LIMIT 50", conn, params=(USER_HASH, today_str))
             conn.close()
             if not df_live.empty:
                 st.dataframe(df_live, use_container_width=True, hide_index=True)
             else:
-                st.info("സ്കാനിംഗ് ഡാറ്റ വരാൻ കാത്തിരിക്കുന്നു (മാർക്കറ്റ് സമയം: 9:20 AM - 3:15 PM)...")
+                st.info(T["wait_scan"])
         except Exception:
-            st.info("സ്കാനിംഗ് ഡാറ്റ വരാൻ കാത്തിരിക്കുന്നു...")
+            st.info(T["wait_scan"])
 
     with t2:
         try:
@@ -608,86 +795,86 @@ if main_menu == "⚡ ഇൻട്രാഡേ ട്രേഡിംഗ് ബോ
             if not df_tr.empty:
                 st.dataframe(df_tr, use_container_width=True, hide_index=True)
             else:
-                st.info("ഇതുവരെ ട്രേഡുകൾ ഒന്നും നടന്നിട്ടില്ല.")
+                st.info(T["no_trades"])
         except Exception:
-            st.info("ട്രേഡുകൾ ഒന്നും നടന്നിട്ടില്ല.")
+            st.info(T["no_trades"])
 
     if state['running']:
-        if st.button("🔄 സ്റ്റാറ്റസ് റിഫ്രഷ് ചെയ്യുക"):
+        if st.button(T["refresh_btn"]):
             st.rerun()
 
 # ##################################################################
-# 🎯 വിഭാഗം 2: ലക്ഷ്യാധിഷ്ഠിത പോർട്ട്ഫോളിയോ
+# 🎯 MODULE 2: DYNAMIC GOAL ALLOCATOR
 # ##################################################################
-elif main_menu == "🎯 ലക്ഷ്യാധിഷ്ഠിത പോർട്ട്ഫോളിയോ (Goal Engine)":
-    st.title("🎯 ലക്ഷ്യാധിഷ്ഠിത വെൽത്ത് കാൽക്കുലേറ്റർ")
-    st.caption("കാലാവധിയും വിപണി സാഹചര്യവും അനുസരിച്ച് പണം വിന്യസിക്കുക.")
+elif main_menu == T["m2"]:
+    st.title(T["m2"])
+    st.caption("Multi-Horizon Capital Allocation & Macroeconomic Crisis Sentinel.")
 
     if is_shariah:
-        st.success("🌙 **100% ശരീഅത്ത് മോഡ് സജീവം:** പലിശ ബാങ്കുകളോ, നോൺ-ഹലാൽ കടപത്രങ്ങളോ ഇല്ലാതെ പൂർണ്ണമായും ശുദ്ധമായ ഹലാൽ അസറ്റുകൾ മാത്രം ഉൾപ്പെടുത്തിയിരിക്കുന്നു.")
+        st.success("🌙 **100% Shariah Mode Active:** Conventional debt and interest instruments are excluded in favor of AAOIFI-compliant assets.")
 
     c1, c2, c3 = st.columns(3)
-    inv_type = c1.selectbox("നിക്ഷേപ രീതി:", ["പ്രതിമാസ നിക്ഷേപം (Monthly SIP)", "ഒറ്റത്തവണ നിക്ഷേപം (Lump-sum)"])
-    inv_amount = c2.number_input("നിക്ഷേപിക്കുന്ന തുക (₹):", value=10000.0, step=1000.0)
+    inv_type = c1.selectbox("Investment Mode:", ["Monthly SIP", "Lump-Sum Allocation"])
+    inv_amount = c2.number_input("Investment Amount (₹):", value=10000.0, step=1000.0)
     goal_horizon = c3.selectbox(
-        "നിക്ഷേപ കാലാവധിയും ലക്ഷ്യവും:",
+        "Time Horizon & Objective:",
         [
-            "⏳ 1 വർഷം (ഹ്രസ്വകാല അത്യാവശ്യ ഫണ്ട് / ലിക്വിഡിറ്റി)",
-            "🚀 3 - 5 വർഷം (ഇടത്തരം വളർച്ച / ബിസിനസ്സ് / വീട്)",
-            "🏛️ 10+ വർഷം (ദീർഘകാല സാമ്പത്തിക സ്വാതന്ത്ര്യം / വിരമിക്കൽ)"
+            "⏳ 1 Year (Short-Term Liquidity / Emergency)",
+            "🚀 3 - 5 Years (Medium-Term Growth / House / Business)",
+            "🏛️ 10+ Years (Generational Wealth / Retirement)"
         ]
     )
 
     st.markdown("---")
-    st.subheader("🛡️ മാക്രോ മാർക്കറ്റ് & യുദ്ധ സാഹചര്യം (Market Climate Sentinel)")
+    st.subheader("🛡️ Macroeconomic & Geopolitical Climate Sentinel")
     market_climate = st.selectbox(
-        "നിലവിലെ വിപണി സാഹചര്യം വിലയിരുത്തുക:",
+        "Current Market Regime:",
         [
-            "🟢 ശാന്തമായ വിപണി (Normal Bull / Steady Growth)",
-            "⚠️ അസ്ഥിരതയും യുദ്ധ ഭീഷണിയും / എണ്ണവില വർദ്ധനവ് (War / High Oil / Volatility)",
-            "🔴 വിപണിയിലെ കടുത്ത തകർച്ച (Blood on the Streets / Extreme Crash)"
+            "🟢 Normal Bull / Steady Economic Growth",
+            "⚠️ Geopolitical Tension / War / Crude Oil Spike",
+            "🔴 Extreme Market Crash (Blood on the Streets)"
         ]
     )
 
-    if "1 വർഷം" in goal_horizon:
+    if "1 Year" in goal_horizon:
         if is_shariah: eq_pct, gold_pct, cash_pct, reit_pct = 0.15, 0.35, 0.50, 0.0
         else: eq_pct, gold_pct, cash_pct, reit_pct = 0.15, 0.25, 0.50, 0.10
-        rec_text = "1 വർഷത്തെ ഹ്രസ്വകാലത്തേക്ക് ഇക്വിറ്റി റിസ്ക് കുറയ്ക്കണം. ലിക്വിഡ് കാഷിലും സ്വർണ്ണത്തിലും മുൻഗണന."
-    elif "3 - 5 വർഷം" in goal_horizon:
-        if "യുദ്ധ" in market_climate: eq_pct, gold_pct, cash_pct, reit_pct = 0.40, 0.30 if is_shariah else 0.25, 0.30 if is_shariah else 0.25, (0.0 if is_shariah else 0.10)
+        rec_text = "Minimize equity volatility for 1-year horizons. Prioritize physical gold ETFs and liquid cash."
+    elif "3 - 5 Years" in goal_horizon:
+        if "War" in market_climate: eq_pct, gold_pct, cash_pct, reit_pct = 0.40, 0.30 if is_shariah else 0.25, 0.30 if is_shariah else 0.25, (0.0 if is_shariah else 0.10)
         else: eq_pct, gold_pct, cash_pct, reit_pct = 0.60, 0.20 if is_shariah else 0.15, 0.20 if is_shariah else 0.15, (0.0 if is_shariah else 0.10)
-        rec_text = "ഇടത്തരം കാലാവധിയിൽ ഹൈ-ഗ്രോത്ത് കമ്പനികൾക്കും എത്തിക്കൽ ഫണ്ടുകൾക്കും മുൻഗണന."
+        rec_text = "Balanced growth across high-ROCE quality equities and sovereign/gold hedges."
     else:
-        if "തകർച്ച" in market_climate: eq_pct, gold_pct, cash_pct, reit_pct = 0.75, 0.15, 0.10, 0.0
+        if "Crash" in market_climate: eq_pct, gold_pct, cash_pct, reit_pct = 0.75, 0.15, 0.10, 0.0
         else: eq_pct, gold_pct, cash_pct, reit_pct = 0.70 if is_shariah else 0.65, 0.20 if is_shariah else 0.15, 0.10, (0.0 if is_shariah else 0.10)
-        rec_text = "ദീർഘകാലത്തേക്ക് അൺബ്രേക്കബിൾ കുത്തകകളിൽ പണം കോമ്പൗണ്ട് ചെയ്യാൻ അനുവദിക്കുക."
+        rec_text = "Deploy aggressively into debt-free monopolies for 10+ year compounding."
 
-    st.info(f"💡 **വിദഗ്ദ്ധന്റെ നിർദ്ദേശം:** {rec_text}")
+    st.info(f"💡 **Institutional Allocation Guidance:** {rec_text}")
     a1, a2, a3, a4 = st.columns(4)
-    a1.metric("ഇക്വിറ്റി ഓഹരികൾ", f"₹{(inv_amount * eq_pct):,.0f}", f"{int(eq_pct*100)}%")
-    a2.metric("ഗോൾഡ് & സിൽവർ", f"₹{(inv_amount * gold_pct):,.0f}", f"{int(gold_pct*100)}%")
-    a3.metric("ക്യാഷ് / കറന്റ് അക്കൗണ്ട്", f"₹{(inv_amount * cash_pct):,.0f}", f"{int(cash_pct*100)}%")
-    if not is_shariah: a4.metric("റിയൽ എസ്റ്റേറ്റ് REITs", f"₹{(inv_amount * reit_pct):,.0f}", f"{int(reit_pct*100)}%")
-    else: a4.metric("ശരീഅത്ത് പാലിക്കൽ", "100% Halal", "AAOIFI")
+    a1.metric("Core Equities", f"₹{(inv_amount * eq_pct):,.0f}", f"{int(eq_pct*100)}%")
+    a2.metric("Gold & Silver", f"₹{(inv_amount * gold_pct):,.0f}", f"{int(gold_pct*100)}%")
+    a3.metric("Cash Reserve", f"₹{(inv_amount * cash_pct):,.0f}", f"{int(cash_pct*100)}%")
+    if not is_shariah: a4.metric("REITs / Yield", f"₹{(inv_amount * reit_pct):,.0f}", f"{int(reit_pct*100)}%")
+    else: a4.metric("Compliance", "100% Halal", "AAOIFI")
 
 # ##################################################################
-# 💼 വിഭാഗം 3: എന്റെ ലൈവ് പോർട്ട്ഫോളിയോ (All Brokers Sync)
+# 💼 MODULE 3: LIVE PORTFOLIO & ALL-BROKER WATCHDOG
 # ##################################################################
-elif main_menu == "💼 എന്റെ ലൈവ് പോർട്ട്ഫോളിയോ (All Brokers Sync)":
-    st.title("💼 മൾട്ടി-ബ്രോക്കർ പോർട്ട്ഫോളിയോ & എക്സിറ്റ് വാച്ച്ഡോഗ്")
-    st.caption("Upstox, Zerodha, Dhan, AngelOne API സിങ്കിംഗും Groww CSV അപ്‌ലോഡും.")
+elif main_menu == T["m3"]:
+    st.title(T["m3"])
+    st.caption("Sync live holdings via Upstox, Dhan, or Zerodha APIs, or track Groww/Manual holdings.")
 
-    h_tab1, h_tab2 = st.tabs(["⚡ ലൈവ് ബ്രോക്കർ API സിങ്ക് (Upstox / Dhan / Zerodha)", "📝 Groww / മറ്റ് ആപ്പുകൾ (CSV Import & Live Price)"])
+    h_tab1, h_tab2 = st.tabs(["⚡ Live Broker API Sync (Upstox / Dhan / Zerodha)", "📝 Groww / Manual Portfolio Tracker"])
 
     with h_tab1:
-        b_choice = st.selectbox("പോർട്ട്ഫോളിയോ സിങ്ക് ചെയ്യാൻ ബ്രോക്കർ തിരഞ്ഞെടുക്കുക:", ["Upstox", "Dhan", "Zerodha"])
+        b_choice = st.selectbox("Select Broker for Holdings Sync:", ["Upstox", "Dhan", "Zerodha"])
         user_token = st.sidebar.text_input(f"{b_choice} Token:", value=state['token'], type="password", key="holdings_token")
 
-        if st.button(f"🔄 {b_choice}-ൽ നിന്ന് പോർട്ട്ഫോളിയോ എടുക്കുക"):
+        if st.button(f"🔄 Sync Holdings from {b_choice}"):
             if not user_token:
-                st.error(f"സൈഡ്‌ബാറിൽ {b_choice} Access Token നൽകുക!")
+                st.error(f"Please enter your {b_choice} Access Token in the sidebar!")
             else:
-                with st.spinner(f"⏳ {b_choice} ഡിമാറ്റിൽ നിന്ന് ഓഹരികൾ സിങ്ക് ചെയ്യുന്നു..."):
+                with st.spinner(f"⏳ Fetching demat holdings from {b_choice}..."):
                     try:
                         holdings = []
                         if b_choice == "Upstox":
@@ -727,9 +914,9 @@ elif main_menu == "💼 എന്റെ ലൈവ് പോർട്ട്ഫോ
                                 total_pnl += pnl
 
                                 pnl_pct = ((cur_p - avg_p) / avg_p * 100) if avg_p > 0 else 0
-                                if pnl_pct < -10.0: sentinel_status = "🚨 എക്സിറ്റ് മുന്നറിയിപ്പ് (Stop-Loss / Review)"
-                                elif pnl_pct > 20.0: sentinel_status = "🟢 മികച്ച ലാഭത്തിൽ (Hold / Trail SL)"
-                                else: sentinel_status = "🟡 സാധാരണ നിലയിൽ (Hold)"
+                                if pnl_pct < -10.0: sentinel_status = "🚨 Exit Alert (Stop-Loss / Review)"
+                                elif pnl_pct > 20.0: sentinel_status = "🟢 Strong Compounder (Hold / Trail SL)"
+                                else: sentinel_status = "🟡 Normal Range (Hold)"
 
                                 parsed_h.append({
                                     'Stock': sym, 'Quantity': qty, 'Avg Buy Price': round(avg_p, 2),
@@ -738,23 +925,23 @@ elif main_menu == "💼 എന്റെ ലൈവ് പോർട്ട്ഫോ
                                 })
 
                             hc1, hc2 = st.columns(2)
-                            hc1.metric("ആകെ പോർട്ട്ഫോളിയോ മൂല്യം", f"₹{total_val:,.2f}")
-                            hc2.metric("ആകെ ലാഭം / നഷ്ടം", f"₹{total_pnl:,.2f}", delta=f"₹{total_pnl:,.2f}")
+                            hc1.metric("Total Portfolio Value", f"₹{total_val:,.2f}")
+                            hc2.metric("Total Unrealized P&L", f"₹{total_pnl:,.2f}", delta=f"₹{total_pnl:,.2f}")
                             st.dataframe(pd.DataFrame(parsed_h), use_container_width=True, hide_index=True)
                         else:
-                            st.info(f"നിങ്ങളുടെ {b_choice} അക്കൗണ്ടിൽ നിലവിൽ ഹോൾഡിംഗ്സുകൾ ഒന്നും കണ്ടെത്തിയില്ല.")
+                            st.info(f"No long-term holdings found in your {b_choice} account.")
                     except Exception as e:
-                        st.error(f"ഡാറ്റ ലഭിക്കുന്നതിൽ തടസ്സം: {e}")
+                        st.error(f"Error syncing holdings: {e}")
 
     with h_tab2:
-        st.subheader("📝 Groww / Zerodha / മറ്റ് ആപ്പുകളിലെ ഓഹരികൾ ചേർക്കുക")
+        st.subheader("📝 Add Holdings from Groww / Zerodha / Other Brokers")
         col_m1, col_m2, col_m3, col_m4 = st.columns(4)
-        m_sym = col_m1.text_input("സ്റ്റോക്ക് സിംബൽ (ഉദാ: TCS, CDSL):").upper().strip()
-        m_qty = col_m2.number_input("വാങ്ങിയ എണ്ണം (Qty):", value=1, min_value=1, step=1)
-        m_bp = col_m3.number_input("വാങ്ങിയ വില (₹):", value=100.0, min_value=1.0, step=10.0)
-        m_plat = col_m4.selectbox("പ്ലാറ്റ്‌ഫോം:", ["Groww", "Zerodha", "AngelOne", "Other"])
+        m_sym = col_m1.text_input("Stock Symbol (e.g. TCS, CDSL):").upper().strip()
+        m_qty = col_m2.number_input("Quantity:", value=1, min_value=1, step=1)
+        m_bp = col_m3.number_input("Buy Price (₹):", value=100.0, min_value=1.0, step=10.0)
+        m_plat = col_m4.selectbox("Broker Platform:", ["Groww", "Zerodha", "AngelOne", "Other"])
 
-        if st.button("➕ എന്റെ പോർട്ട്ഫോളിയോയിലേക്ക് ചേർക്കുക"):
+        if st.button("➕ Save to Private Portfolio"):
             if m_sym:
                 try:
                     conn = get_db_connection()
@@ -763,89 +950,89 @@ elif main_menu == "💼 എന്റെ ലൈവ് പോർട്ട്ഫോ
                               (USER_HASH, m_sym, m_qty, m_bp, datetime.date.today().strftime("%Y-%m-%d"), m_plat))
                     conn.commit()
                     conn.close()
-                    st.success(f"✅ {m_sym} ({m_plat}) നിങ്ങളുടെ സ്വകാര്യ പോർട്ട്ഫോളിയോയിൽ ചേർത്തു!")
+                    st.success(f"✅ {m_sym} ({m_plat}) added to your private portfolio!")
                 except Exception as e:
-                    st.error(f"സേവ് ചെയ്യുന്നതിൽ തടസ്സം: {e}")
+                    st.error(f"Error: {e}")
 
         st.markdown("---")
         try:
             conn = get_db_connection()
-            df_man = pd.read_sql_query("SELECT symbol AS Stock, qty AS Qty, buy_price AS [Buy Price], buy_date AS [Bought Date], notes AS Platform FROM manual_portfolio WHERE user_hash=? ORDER BY id DESC", conn, params=(USER_HASH,))
+            df_man = pd.read_sql_query("SELECT symbol AS Stock, qty AS Qty, buy_price AS [Buy Price], buy_date AS [Date], notes AS Broker FROM manual_portfolio WHERE user_hash=? ORDER BY id DESC", conn, params=(USER_HASH,))
             conn.close()
             if not df_man.empty:
                 st.dataframe(df_man, use_container_width=True, hide_index=True)
             else:
-                st.info("നിങ്ങളുടെ പാസ്‌കീയിൽ ഇതുവരെ മാനുവൽ ഓഹരികൾ ചേർത്തിട്ടില്ല.")
+                st.info("No manual holdings recorded under your Passkey yet.")
         except Exception:
-            st.info("ഡാറ്റ ലഭ്യമായിട്ടില്ല.")
+            st.info("No manual holdings recorded.")
 
 # ##################################################################
-# 🏛️ വിഭാഗം 4: 50-Year Veteran സ്റ്റോക്ക് നിലവറ
+# 🏛️ MODULE 4: 50-YEAR MOAT STOCK VAULT
 # ##################################################################
-elif main_menu == "🏛️ 50-Year Veteran സ്റ്റോക്ക് നിലവറ (Why Buy & Exit Rules)":
-    st.title("🏛️ 50-Year Veteran ഓഹരി നിലവറ")
-    st.caption("ഓരോ ഓഹരിയും എന്തുകൊണ്ട് വാങ്ങി? എപ്പോൾ വിറ്റ് ഒഴിവാക്കണം എന്നതിന്റെ കർശനമായ എക്സിറ്റ് നിയമങ്ങൾ.")
+elif main_menu == T["m4"]:
+    st.title(T["m4"])
+    st.caption("High-ROCE, low-debt compounders with strict institutional exit rules.")
 
     if is_shariah:
-        st.success("🌙 **ശരീഅത്ത് ഓഹരികൾ:** പലിശ രഹിത, കടബാധ്യത 33%-ൽ താഴെയുള്ള കമ്പനികൾ.")
+        st.success("🌙 **AAOIFI Shariah Compliant Equities:** Debt < 33%, Interest Income < 5%.")
         stocks_data = [
-            {"Stock": "TCS", "Sector": "IT Services", "Why Buy?": "കടരഹിത ഭീമൻ, 58% ROCE, ഉയർന്ന ക്യാഷ് ഫ്ലോ.", "Red Flags": "AI കാരണം ബില്ലിംഗ് ഇടിയുന്നത്.", "Exit Trigger": "ഓപ്പറേറ്റിംഗ് മാർജിൻ 20%-ൽ താഴെയായാൽ.", "Status": "✅ Halal"},
-            {"Stock": "Tata Elxsi", "Sector": "Design & EV", "Why Buy?": "ഇലക്ട്രിക് വാഹന സോഫ്റ്റ്‌വെയറിലെ കുത്തക. 42% ROCE.", "Red Flags": "യൂറോപ്യൻ വാഹന വിപണിയിലെ മാന്ദ്യം.", "Exit Trigger": "വിറ്റുവരവ് വളർച്ച 10%-ൽ താഴെയായാൽ.", "Status": "✅ Halal"},
-            {"Stock": "Sun Pharma", "Sector": "Pharma", "Why Buy?": "ജീവൻരക്ഷാ മരുന്നുകൾ, മാന്ദ്യത്തെ അതിജീവിക്കുന്ന ബിസിനസ്സ്.", "Red Flags": "USFDA റെഗുലേറ്ററി തടസ്സങ്ങൾ.", "Exit Trigger": "പ്രധാന പ്ലാന്റുകൾ സ്ഥിരമായി പൂട്ടിയാൽ.", "Status": "✅ Halal"},
-            {"Stock": "Polycab India", "Sector": "Cables & Infra", "Why Buy?": "വയർ വിപണിയിലെ 25% കുത്തക. 28% ROCE.", "Red Flags": "ചെമ്പ് വിലക്കയറ്റം.", "Exit Trigger": "വിപണി വിഹിതം നഷ്ടപ്പെടുകയോ തട്ടിപ്പ് വരികയോ ചെയ്താൽ.", "Status": "✅ Halal"}
+            {"Stock": "TCS", "Sector": "IT Services", "Why Buy?": "Zero-debt cash machine, 58%+ ROCE, strong global moat.", "Red Flags": "AI-driven billing compression.", "Exit Trigger": "Operating margin drops below 20%.", "Status": "✅ Halal"},
+            {"Stock": "Tata Elxsi", "Sector": "Design & EV", "Why Buy?": "Embedded EV software leader, 42% ROCE.", "Red Flags": "European auto slowdown.", "Exit Trigger": "Revenue growth falls below 10% YoY.", "Status": "✅ Halal"},
+            {"Stock": "Sun Pharma", "Sector": "Specialty Pharma", "Why Buy?": "Defensive healthcare moat, strong cash flows.", "Red Flags": "USFDA regulatory observations.", "Exit Trigger": "Permanent import ban on core plants.", "Status": "✅ Halal"},
+            {"Stock": "Polycab India", "Sector": "Cables & Wires", "Why Buy?": "25%+ organized market share, 28% ROCE.", "Red Flags": "Copper price volatility.", "Exit Trigger": "Governance red flags or market share loss.", "Status": "✅ Halal"}
         ]
     else:
         stocks_data = [
-            {"Stock": "CDSL", "Sector": "Depository", "Why Buy?": "ഡിമാറ്റ് അക്കൗണ്ടുകൾ കൂടുമ്പോൾ ടോൾ ബൂത്ത് പോലെ ലാഭം. 33% ROCE.", "Red Flags": "SEBI ചാർജുകൾ വെട്ടിക്കുറയ്ക്കൽ.", "Exit Trigger": "റെഗുലേറ്ററി കമ്മീഷൻ പകുതിയായി കുറച്ചാൽ.", "Status": "⚠️ കൺവെൻഷണൽ"},
-            {"Stock": "L&T", "Sector": "Infrastructure", "Why Buy?": "ഇന്ത്യൻ വികസനത്തിലെ ഏക ഭീമൻ. ₹5 ലക്ഷം കോടി ഓർഡർ ബുക്ക്.", "Red Flags": "സർക്കാർ അടിസ്ഥാന ചെലവുകൾ വെട്ടിക്കുറയ്ക്കൽ.", "Exit Trigger": "കടം (Debt/Equity) 1.5 കടന്നാൽ.", "Status": "⚠️ കൺവെൻഷണൽ"},
-            {"Stock": "ITC Limited", "Sector": "FMCG / Cash Cow", "Why Buy?": "ഭീമമായ ക്യാഷ് ഫ്ലോ. 3.5%+ ഡിവിഡന്റ്. മാന്ദ്യത്തെ അതിജീവിക്കും.", "Red Flags": "പുകയില നികുതി വർദ്ധനവ്.", "Exit Trigger": "ക്യാഷ് ഫ്ലോ ഇടിയുകയോ സിഗരറ്റ് നിരോധിക്കുകയോ ചെയ്താൽ.", "Status": "❌ Non-Halal"},
-            {"Stock": "HAL", "Sector": "Defence", "Why Buy?": "വ്യോമസേനയ്ക്ക് ഫൈറ്റർ ജെറ്റുകൾ നിർമ്മിക്കുന്ന പരമാധികാര കുത്തക. കടമില്ല.", "Red Flags": "പ്രതിരോധ വിഹിതം വെട്ടിക്കുറയ്ക്കൽ.", "Exit Trigger": "സ്വകാര്യ കമ്പനികൾക്ക് നിർമ്മാണാനുമതി നൽകിയാൽ.", "Status": "⚠️ കൺവെൻഷണൽ"}
+            {"Stock": "CDSL", "Sector": "Market Infrastructure", "Why Buy?": "Duopoly depository toll-booth business, 33% ROCE.", "Red Flags": "Regulatory fee caps by SEBI.", "Exit Trigger": "Tariff structure cut by more than 50%.", "Status": "⚠️ Conventional"},
+            {"Stock": "L&T", "Sector": "Infrastructure Giant", "Why Buy?": "Backbone of Indian capex, ₹5L+ Cr order book.", "Red Flags": "Government capex slowdown.", "Exit Trigger": "Debt-to-Equity exceeds 1.5x.", "Status": "⚠️ Conventional"},
+            {"Stock": "ITC Limited", "Sector": "FMCG / Cash Cow", "Why Buy?": "Massive free cash flow, 3.5%+ dividend yield.", "Red Flags": "Punitive sin-tax hikes.", "Exit Trigger": "Core cash flow decline for 2 consecutive years.", "Status": "❌ Non-Halal"},
+            {"Stock": "HAL", "Sector": "Sovereign Defence", "Why Buy?": "Monopoly fighter jet manufacturer, debt-free.", "Red Flags": "Execution delays in engine supply.", "Exit Trigger": "Loss of sovereign monopoly status.", "Status": "⚠️ Conventional"}
         ]
 
     for s in stocks_data:
         with st.expander(f"📌 {s['Stock']} — ({s['Sector']})"):
-            st.markdown(f"**🟢 എന്തുകൊണ്ട് വാങ്ങണം:** {s['Why Buy?']}")
-            st.markdown(f"**⚠️ ശ്രദ്ധിക്കേണ്ട റിസ്കുകൾ:** {s['Red Flags']}")
-            st.error(f"🛑 **എപ്പോൾ വിറ്റ് ഒഴിവാക്കണം (Exit Trigger):** {s['Exit Trigger']}")
-            st.caption(f"സ്റ്റാറ്റസ്: {s['Status']}")
+            st.markdown(f"**🟢 Investment Thesis:** {s['Why Buy?']}")
+            st.markdown(f"**⚠️ Key Risks:** {s['Red Flags']}")
+            st.error(f"🛑 **Institutional Exit Trigger:** {s['Exit Trigger']}")
+            st.caption(f"Compliance Status: {s['Status']}")
 
 # ##################################################################
-# 📈 വിഭാഗം 5: മ്യൂച്വൽ ഫണ്ടുകൾ & ഇ.ടി.എഫുകൾ
+# 📈 MODULE 5: MUTUAL FUNDS & ETFS
 # ##################################################################
-elif main_menu == "📈 മ്യൂച്വൽ ഫണ്ടുകൾ & ഇ.ടി.എഫുകൾ":
-    st.title("📈 മ്യൂച്വൽ ഫണ്ട് & ഇ.ടി.എഫ് സെലക്ടർ")
+elif main_menu == T["m5"]:
+    st.title(T["m5"])
     if is_shariah:
         funds = [
-            {"Fund": "Tata Ethical Fund", "Type": "Shariah Equity", "3Y CAGR": "20.8%", "5Y CAGR": "22.5%", "Expense": "0.85%"},
-            {"Fund": "Taurus Ethical Fund", "Type": "Shariah Equity", "3Y CAGR": "22.1%", "5Y CAGR": "21.2%", "Expense": "0.95%"},
-            {"Fund": "Nippon Gold BeES", "Type": "Physical Gold", "3Y CAGR": "16.4%", "5Y CAGR": "14.8%", "Expense": "0.55%"}
+            {"Fund": "Tata Ethical Fund (Direct)", "Type": "Shariah Equity", "3Y CAGR": "20.8%", "5Y CAGR": "22.5%", "Expense": "0.85%"},
+            {"Fund": "Taurus Ethical Fund (Direct)", "Type": "Shariah Equity", "3Y CAGR": "22.1%", "5Y CAGR": "21.2%", "Expense": "0.95%"},
+            {"Fund": "Nippon India Gold BeES", "Type": "Physical Gold ETF", "3Y CAGR": "16.4%", "5Y CAGR": "14.8%", "Expense": "0.55%"}
         ]
     else:
         funds = [
             {"Fund": "Parag Parikh Flexi Cap Fund", "Type": "Flexi Cap", "3Y CAGR": "21.5%", "5Y CAGR": "24.2%", "Expense": "0.62%"},
-            {"Fund": "UTI Nifty 50 Index Fund", "Type": "Index", "3Y CAGR": "15.8%", "5Y CAGR": "16.5%", "Expense": "0.18%"},
+            {"Fund": "UTI Nifty 50 Index Fund", "Type": "Passive Index", "3Y CAGR": "15.8%", "5Y CAGR": "16.5%", "Expense": "0.18%"},
             {"Fund": "Quant Small Cap Fund", "Type": "Small Cap", "3Y CAGR": "34.2%", "5Y CAGR": "38.5%", "Expense": "0.77%"}
         ]
     st.dataframe(pd.DataFrame(funds), use_container_width=True, hide_index=True)
 
 # ##################################################################
-# 🌍 വിഭാഗം 6: ആഗോള വിപണികൾ (INDmoney / US Live Portfolio Tracker)
+# 🌍 MODULE 6: GLOBAL MARKETS (INDMONEY / VESTED LIVE US TRACKER)
 # ##################################################################
-elif main_menu == "🌍 ആഗോള വിപണികൾ (INDmoney / US Live Tracker)":
-    st.title("🌍 ആഗോള വിപണി & INDmoney / Vested ലൈവ് പോർട്ട്ഫോളിയോ")
-    st.caption("US ഓഹരികളുടെ തത്സമയ ഡോളർ വിലയും രൂപയുടെ മൂല്യവ്യത്യാസവും (Currency Arbitrage) ഒന്നിച്ച് ട്രാക്ക് ചെയ്യുക.")
+elif main_menu == T["m6"]:
+    st.title(T["m6"])
+    st.caption("Track US Stocks (INDmoney / Vested / Alpaca) with live USD price and INR currency appreciation.")
 
-    u_tab1, u_tab2 = st.tabs(["🇺🇸 എന്റെ US പോർട്ട്ഫോളിയോ (INDmoney / Vested / Alpaca)", "🏆 മികച്ച ആഗോള ഓഹരികൾ"])
+    u_tab1, u_tab2 = st.tabs(["🇺🇸 My US Portfolio (INDmoney / Vested / Alpaca)", "🏆 Global Moat Leaders"])
 
     with u_tab1:
-        st.subheader("📈 നിങ്ങളുടെ US ഓഹരികൾ ചേർക്കുക (Live USD & INR Tracker)")
+        st.subheader("📈 Add US Equities (Live USD & INR Valuation)")
         uc1, uc2, uc3, uc4 = st.columns(4)
-        u_sym = uc1.text_input("US സ്റ്റോക്ക് സിംബൽ (ഉദാ: NVDA, AAPL, MSFT, SPUS):").upper().strip()
-        u_qty = uc2.number_input("വാങ്ങിയ എണ്ണം (Fractional Qty):", value=1.0, min_value=0.01, step=0.1)
-        u_bp = uc3.number_input("വാങ്ങിയ വില ($ USD):", value=100.0, min_value=1.0, step=5.0)
-        u_plat = uc4.selectbox("US ആപ്പ് / ബ്രോക്കർ:", ["INDmoney", "Vested", "Alpaca API", "Interactive Brokers"])
+        u_sym = uc1.text_input("US Ticker (e.g. NVDA, AAPL, MSFT, SPUS):").upper().strip()
+        u_qty = uc2.number_input("Quantity (Fractional OK):", value=1.0, min_value=0.01, step=0.1)
+        u_bp = uc3.number_input("Buy Price ($ USD):", value=100.0, min_value=1.0, step=5.0)
+        u_plat = uc4.selectbox("Platform:", ["INDmoney", "Vested", "Alpaca API", "Interactive Brokers"])
 
-        if st.button("➕ US പോർട്ട്ഫോളിയോയിലേക്ക് ചേർക്കുക"):
+        if st.button("➕ Add to US Portfolio"):
             if u_sym:
                 try:
                     conn = get_db_connection()
@@ -854,7 +1041,7 @@ elif main_menu == "🌍 ആഗോള വിപണികൾ (INDmoney / US Live T
                               (USER_HASH, u_sym, u_qty, u_bp, 84.0, u_plat))
                     conn.commit()
                     conn.close()
-                    st.success(f"✅ {u_sym} നിങ്ങളുടെ US പോർട്ട്ഫോളിയോയിൽ ചേർത്തു!")
+                    st.success(f"✅ {u_sym} saved to your private US portfolio!")
                 except Exception as e:
                     st.error(f"Error: {e}")
 
@@ -884,60 +1071,60 @@ elif main_menu == "🌍 ആഗോള വിപണികൾ (INDmoney / US Live T
                     pnl_pct = ((live_usd - bp_usd) / bp_usd * 100) if bp_usd > 0 else 0
                     tot_inr_val += val_inr
                     us_rows.append({
-                        "Stock": sym, "App": r['platform'], "Qty": qty,
+                        "Ticker": sym, "Platform": r['platform'], "Qty": qty,
                         "Buy ($)": f"${bp_usd:.2f}", "Live ($)": f"${live_usd:.2f}",
                         "Value (₹ INR)": f"₹{val_inr:,.2f}", "Return (%)": f"{pnl_pct:.1f}%"
                     })
-                st.metric("നിങ്ങളുടെ ആകെ US പോർട്ട്ഫോളിയോ മൂല്യം (ഇന്ത്യൻ രൂപയിൽ)", f"₹{tot_inr_val:,.2f}", f"1 USD = ₹{usd_inr_live:.2f}")
+                st.metric("Total US Portfolio Value (in INR)", f"₹{tot_inr_val:,.2f}", f"Live USD/INR = ₹{usd_inr_live:.2f}")
                 st.dataframe(pd.DataFrame(us_rows), use_container_width=True, hide_index=True)
             else:
-                st.info("INDmoney / Vested എന്നിവയിൽ നിങ്ങൾ വാങ്ങിയ US ഓഹരികൾ മുകളിൽ ചേർത്താൽ തത്സമയ രൂപ/ഡോളർ ലാഭം ഇവിടെ കാണാം.")
+                st.info("Add your INDmoney or Vested US holdings above to track live USD & INR returns.")
         except Exception:
-            st.info("US പോർട്ട്ഫോളിയോ ഡാറ്റ ലഭ്യമല്ല.")
+            st.info("No US holdings recorded yet.")
 
     with u_tab2:
         if is_shariah:
             us_stocks = [
-                {"Company": "Nvidia (NVDA)", "Sector": "AI Hardware", "Shariah": "✅ Compliant", "Moat": "AI ചിപ്പുകളിലെ കുത്തക."},
-                {"Company": "Microsoft (MSFT)", "Sector": "Software", "Shariah": "✅ Compliant", "Moat": "എന്റർപ്രൈസ് ക്ലൗഡ് ശൃംഖല."},
-                {"Company": "SPUS ETF", "Sector": "S&P 500 Shariah", "Shariah": "✅ 100% Halal ETF", "Moat": "അമേരിക്കയിലെ മികച്ച 200 ഹലാൽ കമ്പനികൾ."}
+                {"Company": "Nvidia (NVDA)", "Sector": "AI Hardware", "Shariah": "✅ AAOIFI Compliant", "Moat": "Global AI GPU monopoly."},
+                {"Company": "Microsoft (MSFT)", "Sector": "Cloud & Enterprise", "Shariah": "✅ AAOIFI Compliant", "Moat": "Enterprise OS & Azure cloud ecosystem."},
+                {"Company": "SPUS ETF", "Sector": "S&P 500 Shariah", "Shariah": "✅ 100% Halal ETF", "Moat": "Top 200 Shariah-compliant US titans."}
             ]
         else:
             us_stocks = [
                 {"Company": "Microsoft (MSFT)", "Sector": "Cloud / AI", "Market Cap": "$3.1T+"},
-                {"Company": "Apple (AAPL)", "Sector": "Consumer Tech", "Market Cap": "$3.4T+"},
-                {"Company": "Nvidia (NVDA)", "Sector": "AI Chips", "Market Cap": "$3.0T+"},
-                {"Company": "Berkshire Hathaway (BRK.B)", "Sector": "Insurance", "Market Cap": "$900B+"}
+                {"Company": "Apple (AAPL)", "Sector": "Consumer Ecosystem", "Market Cap": "$3.4T+"},
+                {"Company": "Nvidia (NVDA)", "Sector": "AI Semiconductors", "Market Cap": "$3.0T+"},
+                {"Company": "Berkshire Hathaway (BRK.B)", "Sector": "Conglomerate", "Market Cap": "$900B+"}
             ]
         st.dataframe(pd.DataFrame(us_stocks), use_container_width=True, hide_index=True)
 
 # ##################################################################
-# 🥇 വിഭാഗം 7: ഗോൾഡ് & സുരക്ഷിത ആസ്തികൾ
+# 🥇 MODULE 7: GOLD & CRISIS HEDGE ASSETS
 # ##################################################################
-elif main_menu == "🥇 ഗോൾഡ് & സുരക്ഷിത ആസ്തികൾ":
-    st.title("🥇 ഗോൾഡ് & ക്രൈസിസ് പ്രൊട്ടക്ഷൻ")
+elif main_menu == T["m7"]:
+    st.title(T["m7"])
     gold_data = [
-        {"Instrument": "Nippon India Gold BeES (GOLDBEES)", "Asset": "Physical Gold", "Expense": "0.55%", "Shariah": "✅ Halal"},
-        {"Instrument": "HDFC Gold ETF (HDFCGOLD)", "Asset": "Physical Gold", "Expense": "0.30%", "Shariah": "✅ Halal"},
-        {"Instrument": "Nippon India Silver ETF (SILVERBEES)", "Asset": "Physical Silver", "Expense": "0.50%", "Shariah": "✅ Halal"}
+        {"Instrument": "Nippon India Gold BeES (GOLDBEES)", "Backing": "99.5% Physical Bullion", "Expense": "0.55%", "Compliance": "✅ AAOIFI Standard #57"},
+        {"Instrument": "HDFC Gold ETF (HDFCGOLD)", "Backing": "99.5% Physical Bullion", "Expense": "0.30%", "Compliance": "✅ AAOIFI Standard #57"},
+        {"Instrument": "Nippon India Silver ETF (SILVERBEES)", "Backing": "99.9% Physical Silver", "Expense": "0.50%", "Compliance": "✅ AAOIFI Standard #57"}
     ]
     st.dataframe(pd.DataFrame(gold_data), use_container_width=True, hide_index=True)
 
 # ##################################################################
-# 📚 വിഭാഗം 8: അഡ്വൈസറി ജേർണൽ & ചേഞ്ച് ലോഗ്
+# 📚 MODULE 8: INVESTMENT AUDIT JOURNAL
 # ##################################################################
-elif main_menu == "📚 അഡ്വൈസറി ജേർണൽ & ചേഞ്ച് ലോഗ്":
-    st.title("📚 എന്റെ സ്വകാര്യ ഇൻവെസ്റ്റ്മെന്റ് ജേർണൽ")
-    st.caption("നിങ്ങളുടെ പാസ്‌കീയിൽ മാത്രം സൂക്ഷിക്കുന്ന നിക്ഷേപ തീരുമാനങ്ങൾ.")
+elif main_menu == T["m8"]:
+    st.title(T["m8"])
+    st.caption("Private decision log isolated under your personal Passkey.")
 
-    with st.expander("➕ പുതിയ നിക്ഷേപ തീരുമാനം രേഖപ്പെടുത്തുക"):
+    with st.expander("➕ Record New Investment Decision"):
         j_col1, j_col2, j_col3 = st.columns(3)
-        j_asset = j_col1.text_input("അസറ്റ് / സ്റ്റോക്ക് (ഉദാ: TCS, Gold):").upper().strip()
-        j_action = j_col2.selectbox("തീരുമാനം:", ["BUY (വാങ്ങി)", "HOLD (തുടരുന്നു)", "SELL (വിറ്റു)", "WATCHLIST (നിരീക്ഷണത്തിൽ)"])
-        j_status = j_col3.selectbox("സ്വഭാവം:", ["✅ Long-Term Moat", "🌙 Halal Verified", "⚠️ Tactical Bet", "🛑 Rule Exit"])
-        j_reason = st.text_area("എന്തുകൊണ്ട് ഈ തീരുമാനം എടുത്തു? (Veteran Thesis):")
+        j_asset = j_col1.text_input("Asset / Ticker (e.g. TCS, GOLDBEES):").upper().strip()
+        j_action = j_col2.selectbox("Action:", ["BUY", "HOLD", "SELL", "WATCHLIST"])
+        j_status = j_col3.selectbox("Classification:", ["✅ Long-Term Moat", "🌙 Halal Verified", "⚠️ Tactical Bet", "🛑 Rule Exit"])
+        j_reason = st.text_area("Investment Thesis & Exit Criteria:")
 
-        if st.button("💾 ജേർണലിൽ സേവ് ചെയ്യുക"):
+        if st.button("💾 Save to Private Journal"):
             if j_asset and j_reason:
                 try:
                     conn = get_db_connection()
@@ -946,17 +1133,17 @@ elif main_menu == "📚 അഡ്വൈസറി ജേർണൽ & ചേഞ്�
                               (USER_HASH, datetime.date.today().strftime("%Y-%m-%d"), j_asset, "Equity/Asset", j_action, j_status, j_reason))
                     conn.commit()
                     conn.close()
-                    st.success("✅ തീരുമാനം നിങ്ങളുടെ സ്വകാര്യ ജേർണലിൽ രേഖപ്പെടുത്തി!")
+                    st.success("✅ Decision logged in your private journal!")
                 except Exception as e:
-                    st.error(f"സേവ് ചെയ്യുന്നതിൽ തടസ്സം: {e}")
+                    st.error(f"Error: {e}")
 
     try:
         conn = get_db_connection()
-        df_audit = pd.read_sql_query("SELECT date AS Date, asset AS Asset, action AS Action, status AS Status, veteran_reason AS [Reason / Thesis] FROM wealth_audit WHERE user_hash=? ORDER BY id DESC LIMIT 50", conn, params=(USER_HASH,))
+        df_audit = pd.read_sql_query("SELECT date AS Date, asset AS Asset, action AS Action, status AS Classification, veteran_reason AS [Thesis / Notes] FROM wealth_audit WHERE user_hash=? ORDER BY id DESC LIMIT 50", conn, params=(USER_HASH,))
         conn.close()
         if not df_audit.empty:
             st.dataframe(df_audit, use_container_width=True, hide_index=True)
         else:
-            st.info("തീരുമാനങ്ങൾ ഇവിടെ ഓഡിറ്റ് ആയി രേഖപ്പെടുത്തും.")
+            st.info("No journal entries recorded under your Passkey yet.")
     except Exception:
-        st.info("ഡാറ്റ വരാൻ കാത്തിരിക്കുന്നു...")
+        st.info("No journal entries recorded yet.")
