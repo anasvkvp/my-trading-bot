@@ -47,22 +47,19 @@ def xor_decipher_hex(enc_str, key_str):
 # ==========================================
 @st.cache_data(ttl=600)
 def live_search_yahoo_tickers(query_str, market_filter="ALL"):
-    """Searches Yahoo Finance live database for ANY NSE (.NS), BSE (.BO), or US stock."""
     if not query_str or len(query_str.strip()) < 1:
         return []
     url = f"https://query2.finance.yahoo.com/v1/finance/search?q={urllib.parse.quote(query_str.strip())}&quotesCount=25&newsCount=0"
-    headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}
+    headers = {"User-Agent": "Mozilla/5.0"}
     results = []
     try:
         res = requests.get(url, headers=headers, timeout=6)
         if res.status_code == 200:
-            quotes = res.json().get("quotes", [])
-            for q in quotes:
+            for q in res.json().get("quotes", []):
                 sym = q.get("symbol", "")
                 name = q.get("longname") or q.get("shortname") or sym
                 exch = q.get("exchDisp") or q.get("exchange") or ""
-                qtype = q.get("quoteType", "")
-                if qtype not in ["EQUITY", "ETF", "INDEX"]:
+                if q.get("quoteType", "") not in ["EQUITY", "ETF", "INDEX"]:
                     continue
                 if market_filter == "INDIA" and not (sym.endswith(".NS") or sym.endswith(".BO")):
                     continue
@@ -75,16 +72,11 @@ def live_search_yahoo_tickers(query_str, market_filter="ALL"):
 
 @st.cache_data(ttl=900)
 def analyze_any_stock_deep(ticker_sym, shariah_mode=False):
-    """
-    Combines International (Buffett/Munger) + Indian Standards (Coffee Can ROCE, Promoter Holding,
-    Operating Cash Flow, India Quality-Adjusted Fair Value instead of raw US Graham formula, and COVID Crash Resilience).
-    """
     tk = yf.Ticker(ticker_sym)
     info = tk.info or {}
     hist = tk.history(period="max")
     if hist.empty:
         hist = tk.history(period="5y")
-
     if hist.empty and not info.get("regularMarketPrice") and not info.get("currentPrice"):
         return None
 
@@ -97,12 +89,9 @@ def analyze_any_stock_deep(ticker_sym, shariah_mode=False):
 
     mcap = info.get("marketCap") or 0
     tot_debt = info.get("totalDebt") or 0
-    tot_cash = info.get("totalCash") or 0
     op_cashflow = info.get("operatingCashflow") or 0
-    free_cashflow = info.get("freeCashflow") or op_cashflow
     promoter_holding = (info.get("heldPercentInsiders") or 0) * 100
     inst_holding = (info.get("heldPercentInstitutions") or 0) * 100
-
     rev_growth = (info.get("revenueGrowth") or 0) * 100
     earn_growth = (info.get("earningsGrowth") or 0) * 100
     op_margin = (info.get("operatingMargins") or 0) * 100
@@ -110,7 +99,6 @@ def analyze_any_stock_deep(ticker_sym, shariah_mode=False):
     pe_ratio = info.get("trailingPE") or info.get("forwardPE") or 0
     eps = info.get("trailingEps") or 0
     bv = info.get("bookValue") or 0
-    div_yield = (info.get("dividendYield") or 0) * 100
 
     raw_roe = info.get("returnOnEquity")
     if raw_roe is not None:
@@ -122,49 +110,32 @@ def analyze_any_stock_deep(ticker_sym, shariah_mode=False):
 
     debt_to_mcap = (tot_debt / mcap * 100) if mcap > 0 else 0.0
 
-    # --- FIX FOR GRAHAM FORMULA IN INDIA ---
-    # Classic US Graham Formula (Sqrt(22.5 * EPS * BV)) penalizes asset-light Indian compounders (TCS, Titan, Polycab).
-    # We calculate BOTH Classic Graham AND India Quality-Growth Fair Value (PEG + ROCE Moat Multiplier).
+    # India Quality-Growth Fair Value + Classic Graham
     graham_raw = float(np.sqrt(22.5 * eps * bv)) if (eps > 0 and bv > 0) else 0.0
     if eps > 0:
         growth_est = max(10.0, min(30.0, max(rev_growth, earn_growth, 12.0)))
         quality_pe_cap = (18.0 + (growth_est * 1.1) + (5.0 if roe >= 20 else 0.0)) if is_indian_stock else (15.0 + growth_est)
-        india_fair_val = float(eps * quality_pe_cap)
-        fair_val = max(graham_raw, india_fair_val)
+        fair_val = max(graham_raw, float(eps * quality_pe_cap))
     else:
         fair_val = curr_p * 0.75
 
-    # Price Returns, 200-DMA & COVID-19 Crash Resilience Test (Jan-Mar 2020)
     ret_1y, ret_5y, above_200dma = 0.0, 0.0, True
     covid_drop_pct = None
     max_dd_5y = 0.0
     if not hist.empty:
         closes = hist['Close']
         if len(closes) >= 200:
-            dma200 = closes.rolling(200).mean().iloc[-1]
-            above_200dma = curr_p >= dma200
-        if len(closes) >= 252:
-            ret_1y = ((curr_p - float(closes.iloc[-252])) / float(closes.iloc[-252])) * 100
-        else:
-            ret_1y = ((curr_p - float(closes.iloc[0])) / float(closes.iloc[0])) * 100
-
+            above_200dma = curr_p >= closes.rolling(200).mean().iloc[-1]
+        ret_1y = ((curr_p - float(closes.iloc[-252])) / float(closes.iloc[-252])) * 100 if len(closes) >= 252 else ((curr_p - float(closes.iloc[0])) / float(closes.iloc[0])) * 100
         hist_5y = closes.tail(1260)
         ret_5y = ((curr_p - float(hist_5y.iloc[0])) / float(hist_5y.iloc[0])) * 100
         roll_max = hist_5y.cummax()
-        dd_series = ((hist_5y - roll_max) / roll_max) * 100
-        max_dd_5y = float(dd_series.min())
-
-        # Check COVID-19 Crash Window (Jan 1, 2020 to Apr 15, 2020)
+        max_dd_5y = float((((hist_5y - roll_max) / roll_max) * 100).min())
         try:
             idx_tz = closes.index.tz
-            c_start = pd.Timestamp("2020-01-01", tz=idx_tz)
-            c_end = pd.Timestamp("2020-04-15", tz=idx_tz)
-            covid_slice = closes[(closes.index >= c_start) & (closes.index <= c_end)]
-            if len(covid_slice) > 10:
-                c_peak = float(covid_slice.max())
-                c_trough = float(covid_slice.min())
-                if c_peak > 0:
-                    covid_drop_pct = ((c_trough - c_peak) / c_peak) * 100
+            covid_slice = closes[(closes.index >= pd.Timestamp("2020-01-01", tz=idx_tz)) & (closes.index <= pd.Timestamp("2020-04-15", tz=idx_tz))]
+            if len(covid_slice) > 10 and float(covid_slice.max()) > 0:
+                covid_drop_pct = ((float(covid_slice.min()) - float(covid_slice.max())) / float(covid_slice.max())) * 100
         except Exception:
             pass
 
@@ -172,7 +143,6 @@ def analyze_any_stock_deep(ticker_sym, shariah_mode=False):
     is_prohibited_sec = any(k.lower() in (sector + " " + industry + " " + comp_name).lower() for k in non_halal_kw)
     shariah_pass = (not is_prohibited_sec) and (debt_to_mcap < 33.0)
 
-    # Detailed Why Recommended vs Why Not (India + Global Standard)
     why_rec, why_not_rec = [], []
     if roe >= 16:
         why_rec.append(f"ഇന്ത്യൻ Coffee-Can നിലവാരത്തിലുള്ള ഉയർന്ന ലാഭക്ഷമത (ROE: {roe:.1f}% >= 16%).")
@@ -194,18 +164,18 @@ def analyze_any_stock_deep(ticker_sym, shariah_mode=False):
     if op_cashflow > 0:
         why_rec.append("പോസിറ്റീവ് ഓപ്പറേറ്റിംഗ് ക്യാഷ് ഫ്ലോ (യഥാർത്ഥ പണം കമ്പനിയിലേക്ക് വരുന്നുണ്ട്).")
     elif op_cashflow < 0:
-        why_not_rec.append("ഓപ്പറേറ്റിംഗ് ക്യാഷ് ഫ്ലോ നെഗറ്റീവ് ആണ് (ലാഭം പേപ്പറിൽ മാത്രമാണ്, പണം കൈയിലില്ല!).")
+        why_not_rec.append("ഓപ്പറേറ്റിംഗ് ക്യാഷ് ഫ്ലോ നെഗറ്റീവ് ആണ് (ലാഭം പേപ്പറിൽ മാത്രമാണ്).")
 
     if curr_p <= fair_val * 1.15 and fair_val > 0:
         why_rec.append(f"ഇന്ത്യൻ വളർച്ചാ ഫോർമുല പ്രകാരം ന്യായമായ വിലയിലാണ് (Current: {curr_sym}{curr_p:,.0f} vs Quality Fair Value: {curr_sym}{fair_val:,.0f}).")
     elif pe_ratio > 65:
-        why_not_rec.append(f"ഓഹരി വില അമിതമായ P/E-യിലാണ് ({pe_ratio:.1f}x). പുതിയ നിക്ഷേപകർ SIP രീതി മാത്രം ഉപയോഗിക്കുക.")
+        why_not_rec.append(f"ഓഹരി വില ഉയർന്ന P/E-യിലാണ് ({pe_ratio:.1f}x). SIP രീതി മാത്രം ഉപയോഗിക്കുക.")
 
     if covid_drop_pct is not None:
         if covid_drop_pct > -28.0:
-            why_rec.append(f"🛡️ **കോവിഡ് തകർച്ച അതിജീവന പരീക്ഷണം പാസ്സായി:** 2020 കോവിഡ് തകർച്ചയിൽ നിഫ്റ്റി -38% വീണപ്പോൾ ഈ ഓഹരി വെറും {covid_drop_pct:.1f}% മാത്രമേ വീണുള്ളൂ!")
+            why_rec.append(f"🛡️ **കോവിഡ് തകർച്ച അതിജീവന പരീക്ഷണം പാസ്സായി:** 2020-ൽ നിഫ്റ്റി -38% വീണപ്പോൾ ഈ ഓഹരി വെറും {covid_drop_pct:.1f}% മാത്രമേ വീണുള്ളൂ!")
         else:
-            why_not_rec.append(f"2020 കോവിഡ് തകർച്ചയിൽ ഈ ഓഹരി {covid_drop_pct:.1f}% ഇടിഞ്ഞിരുന്നു (High Beta).")
+            why_not_rec.append(f"2020 കോവിഡ് തകർച്ചയിൽ ഈ ഓഹരി {covid_drop_pct:.1f}% ഇടിഞ്ഞിരുന്നു.")
 
     if is_prohibited_sec:
         why_not_rec.append(f"ശരീഅത്ത് പരിശോധന: '{sector}' വിഭാഗം പലിശ/നിരോധിത മേഖലയായതിനാൽ ഹലാൽ നിക്ഷേപകർ ഒഴിവാക്കുക.")
@@ -214,12 +184,7 @@ def analyze_any_stock_deep(ticker_sym, shariah_mode=False):
     suit_5y = "✅ 3–5 വർഷത്തേക്ക് മികച്ചത് (Strong ROE, Cashflow & Safe Debt)" if (roe >= 14 and debt_to_mcap < 33 and op_cashflow >= 0) else "❌ 3–5 വർഷത്തേക്ക് റെക്കമെൻഡ് ചെയ്യുന്നില്ല"
     suit_10y = "🏛️ 10+ വർഷത്തേക്ക് നമ്പർ-1 Moat Compounder!" if (roe >= 18 and debt_to_mcap < 20 and op_margin >= 14) else "❌ 10+ വർഷത്തേക്ക് വെക്കാൻ അനുയോജ്യമല്ല"
 
-    overall_score = 0
-    if roe >= 16: overall_score += 30
-    if debt_to_mcap < 25: overall_score += 25
-    if op_margin >= 14 or op_cashflow > 0: overall_score += 20
-    if above_200dma: overall_score += 15
-    if curr_p <= fair_val * 1.2: overall_score += 10
+    overall_score = (30 if roe >= 16 else 0) + (25 if debt_to_mcap < 25 else 0) + (20 if (op_margin >= 14 or op_cashflow > 0) else 0) + (15 if above_200dma else 0) + (10 if curr_p <= fair_val * 1.2 else 0)
     if shariah_mode and not shariah_pass:
         overall_score = min(overall_score, 30)
 
@@ -256,10 +221,6 @@ def search_live_mutual_funds(query_str):
 
 @st.cache_data(ttl=1800)
 def analyze_mutual_fund_with_covid_test(scheme_code):
-    """
-    Analyzes ANY Indian Mutual Fund + Runs a Live COVID-19 Crash Test (Jan-Mar 2020)
-    and Maximum Drawdown Test to prove how well the fund protected investors during market crashes!
-    """
     try:
         res = requests.get(f"https://api.mfapi.in/mf/{scheme_code}", timeout=8)
         if res.status_code == 200:
@@ -281,26 +242,17 @@ def analyze_mutual_fund_with_covid_test(scheme_code):
             def calc_cagr_df(years):
                 target_dt = now_dt - pd.Timedelta(days=int(years * 365.25))
                 sub = df_nav[df_nav['date_obj'] <= target_dt]
-                if not sub.empty:
-                    old_v = float(sub['nav_val'].iloc[-1])
-                    if old_v > 0:
-                        return (((curr_nav / old_v) ** (1.0 / years)) - 1.0) * 100
+                if not sub.empty and float(sub['nav_val'].iloc[-1]) > 0:
+                    return (((curr_nav / float(sub['nav_val'].iloc[-1])) ** (1.0 / years)) - 1.0) * 100
                 return 0.0
 
-            c1 = calc_cagr_df(1.0)
-            c3 = calc_cagr_df(3.0)
-            c5 = calc_cagr_df(5.0)
+            c1, c3, c5 = calc_cagr_df(1.0), calc_cagr_df(3.0), calc_cagr_df(5.0)
 
-            # COVID-19 Crash Drawdown Test (Jan 1, 2020 to Apr 15, 2020 - Nifty fell -38.4%)
             covid_slice = df_nav[(df_nav['date_obj'] >= "2020-01-01") & (df_nav['date_obj'] <= "2020-04-15")]
             covid_drop = None
-            if len(covid_slice) > 10:
-                c_peak = float(covid_slice['nav_val'].max())
-                c_low = float(covid_slice['nav_val'].min())
-                if c_peak > 0:
-                    covid_drop = ((c_low - c_peak) / c_peak) * 100
+            if len(covid_slice) > 10 and float(covid_slice['nav_val'].max()) > 0:
+                covid_drop = ((float(covid_slice['nav_val'].min()) - float(covid_slice['nav_val'].max())) / float(covid_slice['nav_val'].max())) * 100
 
-            # 5-Year Max Drawdown across all crises (2022 War, 2024 Volatility, etc.)
             df_5y = df_nav[df_nav['date_obj'] >= (now_dt - pd.Timedelta(days=1825))]
             roll_max = df_5y['nav_val'].cummax()
             dd = ((df_5y['nav_val'] - roll_max) / roll_max) * 100
@@ -308,19 +260,18 @@ def analyze_mutual_fund_with_covid_test(scheme_code):
 
             sname = meta.get("scheme_name", "")
             is_direct = "direct" in sname.lower()
-            is_growth = "growth" in sname.lower() or "idcw" not in sname.lower()
 
             why_mf, why_not_mf = [], []
             if covid_drop is not None:
                 if covid_drop > -28.0:
-                    why_mf.append(f"🛡️ **കോവിഡ് തകർച്ചയിൽ പിടിച്ചുനിന്ന ഫണ്ട്:** 2020-ൽ നിഫ്റ്റി -38.4% ഇടിഞ്ഞപ്പോൾ ഈ ഫണ്ട് വെറും **{covid_drop:.1f}%** മാത്രമാണ് ഇടിഞ്ഞത്! (ഉയർന്ന സുരക്ഷ).")
+                    why_mf.append(f"🛡️ **കോവിഡ് തകർച്ചയിൽ പിടിച്ചുനിന്ന ഫണ്ട്:** 2020-ൽ നിഫ്റ്റി -38.4% ഇടിഞ്ഞപ്പോൾ ഈ ഫണ്ട് വെറും **{covid_drop:.1f}%** മാത്രമാണ് ഇടിഞ്ഞത്!")
                 else:
                     why_not_mf.append(f"2020 കോവിഡ് തകർച്ചയിൽ ഈ ഫണ്ട് {covid_drop:.1f}% ഇടിഞ്ഞിരുന്നു.")
 
             if max_dd > -20.0:
-                why_mf.append(f"കഴിഞ്ഞ 5 വർഷത്തെ ഏറ്റവും വലിയ ഇടിവ് (Max Drawdown) വെറും `{max_dd:.1f}%` മാത്രമാണ് (Downside Protected).")
+                why_mf.append(f"കഴിഞ്ഞ 5 വർഷത്തെ ഏറ്റവും വലിയ ഇടിവ് (Max Drawdown) വെറും `{max_dd:.1f}%` മാത്രമാണ്.")
             else:
-                why_not_mf.append(f"വിപണി ഇടിയുമ്പോൾ `{max_dd:.1f}%` വരെ താഴേക്ക് പോയിട്ടുണ്ട് (High Volatility).")
+                why_not_mf.append(f"വിപണി ഇടിയുമ്പോൾ `{max_dd:.1f}%` വരെ താഴേക്ക് പോയിട്ടുണ്ട്.")
 
             if c3 >= 15 or c5 >= 15:
                 why_mf.append(f"മികച്ച ദീർഘകാല ലാഭം (3Y CAGR: {c3:.1f}%, 5Y CAGR: {c5:.1f}%).")
@@ -348,7 +299,7 @@ def analyze_mutual_fund_with_covid_test(scheme_code):
 @st.cache_data(ttl=1800)
 def fetch_live_ipos_india():
     ipo_items = []
-    headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}
+    headers = {"User-Agent": "Mozilla/5.0"}
     try:
         s = requests.Session()
         s.get("https://www.nseindia.com", headers=headers, timeout=5)
@@ -1004,12 +955,11 @@ elif main_menu == MENU_ITEMS[5]:
         df_debts = pd.read_sql_query("SELECT id, loan_type, lender, total_amount, interest_rate, emi, status FROM user_debts WHERE user_hash=?", conn, params=(USER_HASH,))
         conn.close()
         if not df_debts.empty:
-            # Smart Priority: Overdue Secured Loans (Home/Gold auction risk) get highest protection priority, then Highest Interest!
             def smart_priority_score(r):
                 is_secured = "സെക്യൂർഡ്" in str(r['loan_type'])
                 is_overdue = ("🔴" in str(r['status']) or "🟡" in str(r['status']))
                 if is_secured and is_overdue:
-                    return 200.0 + float(r['interest_rate'])  # Protect House & Gold from auction first!
+                    return 200.0 + float(r['interest_rate'])
                 status_pts = 50.0 if "🔴" in str(r['status']) else (25.0 if "🟡" in str(r['status']) else 0.0)
                 return float(r['interest_rate']) + status_pts
 
@@ -1054,28 +1004,15 @@ elif main_menu == MENU_ITEMS[5]:
             "ബന്ധുക്കളെയും സഹപ്രവർത്തകരെയും വിളിച്ച് കടവിവരം പറഞ്ഞ് നാണംകെടുത്തി",
             "സാമ്പത്തിക ബുദ്ധിമുട്ട് അറിയിച്ചിട്ടും EMI Restructuring / OTS അനുവദിക്കുന്നില്ല"
         ])
-        letter_text = f"""To,
-The Principal Nodal Officer / Grievance Redressal Officer,
-{comp_bank}
-
-Subject: Formal Complaint against RBI Fair Practices Code Violation & Recovery Harassment (Loan/Card No: {comp_loan_no})
-
-Dear Sir/Madam,
-I am holding Loan/Account No. {comp_loan_no} with your institution. Due to genuine financial hardship, there has been a temporary delay in repayment. 
-
-However, your recovery agents have violated the Reserve Bank of India (RBI) Responsible Business Conduct & Fair Practices Guidelines by engaging in: [{comp_issue}].
-
-As per RBI Master Directions, calling outside 8:00 AM - 7:00 PM, visiting without prior notice/authorization, or contacting third-party relatives/colleagues is strictly prohibited and holds the Regulated Entity (Bank/NBFC) directly liable.
-
-I request you to:
-1. Immediately instruct your recovery agency to cease all unlawful harassment and communicate strictly via official written/recorded channels.
-2. Provide me a reasonable EMI Restructuring / Moratorium / One-Time Settlement (OTS) plan.
-
-Please note that if this harassment continues, I will be constrained to file an official complaint with the RBI Integrated Ombudsman (https://cms.rbi.org.in) along with call recordings and evidence.
-
-Yours sincerely,
-[Your Name & Mobile Number]"""
-        st.text_area("📋 താഴെ കാണുന്ന ഇമെയിൽ കോപ്പി ചെയ്ത് ബാങ്കിന്റെ കസ്റ്റമർ കെയറിലേക്കും നോഡൽ ഓഫീസർക്കും അയക്കുക:", value=letter_text, height=260)
+        letter_text = (
+            f"To,\nThe Principal Nodal Officer / Grievance Redressal Officer,\n{comp_bank}\n\n"
+            f"Subject: Formal Complaint against RBI Fair Practices Code Violation & Recovery Harassment (Account: {comp_loan_no})\n\n"
+            f"Dear Sir/Madam,\nI hold Loan/Card No. {comp_loan_no} with your institution. Due to genuine financial hardship, there has been a temporary delay in repayment.\n"
+            f"However, your recovery agents have violated RBI Responsible Business Conduct Guidelines by: [{comp_issue}].\n\n"
+            f"I request you to immediately stop unlawful recovery harassment and provide an EMI Restructuring / One-Time Settlement (OTS) plan, failing which I will escalate this complaint with evidence to the RBI Ombudsman (https://cms.rbi.org.in).\n\n"
+            f"Yours sincerely,\n[Your Name & Mobile]"
+        )
+        st.text_area("📋 താഴെ കാണുന്ന ഇമെയിൽ കോപ്പി ചെയ്ത് ബാങ്കിന്റെ കസ്റ്റമർ കെയറിലേക്കും നോഡൽ ഓഫീസർക്കും അയക്കുക:", value=letter_text, height=220)
 
 # ##################################################################
 # 🎯 MODULE 6: DYNAMIC GOAL ALLOCATOR
@@ -1097,7 +1034,7 @@ elif main_menu == MENU_ITEMS[6]:
     a3.metric("3. സുരക്ഷിത ക്യാഷ് കരുതൽ", f"₹{(inv_amount * cash_pct):,.0f}", f"{int(cash_pct*100)}%")
 
 # ##################################################################
-# 💼 MODULE 7: LIVE PORTFOLIO & WATCHDOG (WITH INDIVIDUAL DELETE)
+# 💼 MODULE 7: LIVE PORTFOLIO & WATCHDOG
 # ##################################################################
 elif main_menu == MENU_ITEMS[7]:
     st.title(MENU_ITEMS[7])
@@ -1173,16 +1110,12 @@ elif main_menu == MENU_ITEMS[8]:
 
     with st.expander("🇮🇳 ഒരു ഇന്ത്യക്കാരൻ US സ്റ്റോക്കിൽ നിക്ഷേപിക്കുമ്പോൾ അറിയേണ്ട RBI LRS, 20% TCS & ബാങ്ക് ചാർജ് കാൽക്കുലേറ്റർ", expanded=True):
         us_inr_amt = st.number_input("നിങ്ങൾ US വിപണിയിൽ നിക്ഷേപിക്കാൻ ഉദ്ദേശിക്കുന്ന തുക (ഇന്ത്യൻ രൂപയിൽ ₹):", value=50000.0, step=25000.0)
-        forex_fee = us_inr_amt * 0.015  # ~1.5% bank forex markup
-        tcs_tax = max(0.0, (us_inr_amt - 700000.0) * 0.20)  # 20% TCS only above ₹7 Lakh per FY
+        forex_fee = us_inr_amt * 0.015
+        tcs_tax = max(0.0, (us_inr_amt - 700000.0) * 0.20)
         u_c1, u_c2, u_c3 = st.columns(3)
         u_c1.metric("ബാങ്ക് ഫോറെക്സ് ചാർജ് (~1.5%)", f"₹{forex_fee:,.0f}")
         u_c2.metric("RBI LRS 20% TCS നികുതി (> ₹7 Lakh)", f"₹{tcs_tax:,.0f}", "✅ 0% TCS (Under ₹7L)" if tcs_tax == 0 else "Claimable in ITR")
         u_c3.metric("ഇന്ത്യൻ നിക്ഷേപകനുള്ള ശുപാർശ", "🇮🇳 Indian FoF / ETF Route" if us_inr_amt < 75000 else "🇺🇸 Direct INDmoney / Vested Route")
-        if us_inr_amt < 75000:
-            st.warning("💡 **ഇന്ത്യൻ സ്റ്റാൻഡേർഡ് നിർദ്ദേശം:** നിങ്ങളുടെ നിക്ഷേപം ₹75,000-ൽ താഴെയായതിനാൽ നേരിട്ട് ഡോളർ അയച്ചാൽ ബാങ്ക് ചാർജും വിത്ത്‌ഡ്രോവൽ ഫീസും ($5-$10) കാരണം ലാഭം കുറയും. അതിനാൽ ഇന്ത്യയിലെ മ്യൂച്വൽ ഫണ്ട് / ETF വഴി നിക്ഷേപിക്കുന്നതാണ് ഏറ്റവും ലാഭകരം!")
-        else:
-            st.success("💡 **ഇന്ത്യൻ സ്റ്റാൻഡേർഡ് നിർദ്ദേശം:** ₹7 ലക്ഷം വരെ TCS നികുതി ഇല്ലാത്തതിനാൽ INDmoney / Vested / IBKR വഴി നേരിട്ട് US ഓഹരികളോ `SPUS` ഹലാൽ ETF-ഓ വാങ്ങാം! രൂപയുടെ മൂല്യമിടിവ് (+3.5% പ്രതിവർഷം) നിങ്ങൾക്ക് അധിക ലാഭം നൽകും.")
 
     st.subheader("🏆 1. ലോകത്തിലെ നമ്പർ-1 യു.എസ് (US) ഓഹരി റെക്കമെൻഡേഷൻസ്")
     us_recs = [
@@ -1325,7 +1258,6 @@ elif main_menu == MENU_ITEMS[10]:
             now_ist = datetime.datetime.now(ist_zone)
             curr_t = now_ist.time()
 
-            # 1. 3:15 PM Auto Square-Off
             if curr_t >= datetime.time(15, 15):
                 if u_state['active_pos']:
                     pos = u_state['active_pos']
@@ -1340,14 +1272,12 @@ elif main_menu == MENU_ITEMS[10]:
                 time.sleep(15)
                 continue
 
-            # 2. Consecutive Loss Kill Switch
             if u_state['consecutive_losses'] >= 2:
                 u_state['kill_switch'] = True
                 u_state['running'] = False
                 send_telegram_alert("🛑 *Kill Switch Activated!* Halted after 2 consecutive losses.", u_state['tg_token'], u_state['tg_chat'])
                 break
 
-            # 3. Active Position Monitoring (45m Stale Exit, Target, SL)
             if u_state['active_pos']:
                 pos = u_state['active_pos']
                 df_c = fetch_candles_upstox(pos['key'], token)
@@ -1464,4 +1394,60 @@ elif main_menu == MENU_ITEMS[10]:
     m1, m2, m3, m4 = st.columns(4)
     m1.metric("ബോട്ട് സ്റ്റാറ്റസ്", "🟢 സർവറിൽ ഓടുന്നു" if state['running'] else ("🛑 കിൽ സ്വിച്ച് ഓഫ്" if state['kill_switch'] else "🔴 ഓഫ് ആണ്"))
     m2.metric("നിഫ്റ്റി 50 ട്രെൻഡ്", state['nifty_status'])
-    m3.metric("തുടർച്ചയായ നഷ്ടങ്ങൾ", f"{state['consecutive_
+    m3.metric("തുടർച്ചയായ നഷ്ടങ്ങൾ", f"{state['consecutive_losses']} / 2")
+    m4.metric("ക്യാപിറ്റൽ", f"₹{state['capital']:,.2f}")
+
+    if state['active_pos']:
+        ap = state['active_pos']
+        st.success(f"📌 **നിലവിലെ ലൈവ് ട്രേഡ്:** `{ap['symbol']}` | എണ്ണം: `{ap['qty']}` | വാങ്ങിയ വില: `₹{ap['buy_price']:.2f}` | ടാർജറ്റ്: `₹{ap['target']:.2f}` | സ്റ്റോപ്പ്-ലോസ്: `₹{ap['sl']:.2f}`")
+
+    t_log1, t_log2 = st.tabs(["🔍 ലൈവ് സ്കാനിംഗ് ഓഡിറ്റ് ലോഗ്", "📜 പൂർത്തിയായ ട്രേഡുകൾ (Net PnL)"])
+    with t_log1:
+        conn = get_db_connection()
+        today_s = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=5, minutes=30))).strftime("%Y-%m-%d")
+        df_l = pd.read_sql_query("SELECT time AS Time, symbol AS Stock, price AS Price, vwap AS VWAP, rsi AS RSI, nifty_trend AS Nifty, status AS Status, reason AS Evaluation FROM audit_logs WHERE user_hash=? AND date=? ORDER BY id DESC LIMIT 40", conn, params=(USER_HASH, today_s))
+        conn.close()
+        if not df_l.empty:
+            st.dataframe(df_l, use_container_width=True, hide_index=True)
+        else:
+            st.info("മാർക്കറ്റ് സമയത്ത് (9:20 AM - 3:15 PM) ബോട്ട് സ്റ്റാർട്ട് ചെയ്യുമ്പോൾ ലൈവ് സ്കാനിംഗ് ഡാറ്റ ഇവിടെ വരും.")
+    with t_log2:
+        conn = get_db_connection()
+        df_t = pd.read_sql_query("SELECT date, time, symbol, type, qty, buy_price, sell_price, pnl FROM trades WHERE user_hash=? ORDER BY id DESC", conn, params=(USER_HASH,))
+        conn.close()
+        if not df_t.empty:
+            st.dataframe(df_t, use_container_width=True, hide_index=True)
+        else:
+            st.info("ഇതുവരെ ട്രേഡുകൾ നടന്നിട്ടില്ല.")
+
+# ##################################################################
+# 📚 MODULE 11: INVESTMENT AUDIT JOURNAL
+# ##################################################################
+elif main_menu == MENU_ITEMS[11]:
+    st.title(MENU_ITEMS[11])
+    j_asset = render_universal_stock_search("journ_univ", market_filter="ALL", default_query="TCS")
+    j_col1, j_col2 = st.columns(2)
+    j_action = j_col1.selectbox("തീരുമാനം:", ["BUY (വാങ്ങി)", "HOLD (തുടരുന്നു)", "SELL (വിറ്റു)", "WATCHLIST"])
+    j_status = j_col2.selectbox("വിഭാഗം:", ["✅ Long-Term Moat", "🌙 Halal Verified", "⚠️ Tactical Bet", "🛑 Rule Exit"])
+    j_reason = st.text_area("എന്തുകൊണ്ട് ഈ തീരുമാനം എടുത്തു? (Thesis & Exit Rule):")
+
+    if st.button("💾 ജേർണലിൽ സേവ് ചെയ്യുക", type="primary"):
+        if j_asset and j_reason:
+            conn = get_db_connection()
+            conn.execute("INSERT INTO wealth_audit (user_hash, date, asset, category, action, status, veteran_reason) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                         (USER_HASH, datetime.date.today().strftime("%Y-%m-%d"), j_asset, "Equity/Asset", j_action, j_status, j_reason))
+            conn.commit()
+            conn.close()
+            st.success("✅ സേവ് ചെയ്തു!")
+            st.rerun()
+
+    conn = get_db_connection()
+    df_audit = pd.read_sql_query("SELECT date AS Date, asset AS Asset, action AS Action, status AS Classification, veteran_reason AS [Thesis / Notes] FROM wealth_audit WHERE user_hash=? ORDER BY id DESC LIMIT 50", conn, params=(USER_HASH,))
+    conn.close()
+    if not df_audit.empty:
+        st.dataframe(df_audit, use_container_width=True, hide_index=True)
+
+# ##################################################################
+# 💬 MODULE 12: USER FEEDBACK (PRIVATE TELEGRAM & PUBLIC BOARD)
+# ##################################################################
+elif main_
