@@ -11,31 +11,36 @@ import yfinance as yf
 st.set_page_config(page_title="Institutional Algo Bot", layout="wide", page_icon="🛡️")
 
 st.title("🛡️ Upstox ഇൻസ്റ്റിറ്റ്യൂഷണൽ അൽഗോ ബോട്ട് & ജേർണൽ")
-st.caption("25 വർഷത്തെ വിദഗ്ദ്ധ തത്വങ്ങൾ അടങ്ങിയ പൂർണ്ണ ഓട്ടോമാറ്റിക് സിസ്റ്റം (Nifty Guard + Kill Switch + 45m Exit).")
+st.caption("25 വർഷത്തെ വിദഗ്ദ്ധ തത്വങ്ങൾ അടങ്ങിയ സമ്പൂർണ്ണ സിസ്റ്റം (Nifty Guard + Kill Switch + 45m Exit).")
 
 # ==========================================
-# 🗄️ ഡാറ്റാബേസ് സെറ്റപ്പ്
+# 🗄️ പുതിയ സുരക്ഷിത ഡാറ്റാബേസ് സെറ്റപ്പ് (v2)
 # ==========================================
+DB_NAME = "trading_journal_v2.db"
+
 def init_db():
-    conn = sqlite3.connect("trading_journal.db")
-    c = conn.cursor()
-    c.execute('''CREATE TABLE IF NOT EXISTS audit_logs (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    date TEXT, time TEXT, symbol TEXT, price REAL,
-                    vwap REAL, rsi REAL, vol_surge TEXT, ema_cross TEXT,
-                    nifty_trend TEXT, status TEXT, reason TEXT)''')
-    c.execute('''CREATE TABLE IF NOT EXISTS trades (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    date TEXT, time TEXT, symbol TEXT, type TEXT,
-                    buy_price REAL, sell_price REAL, qty INTEGER, pnl REAL)''')
-    conn.commit()
-    conn.close()
+    try:
+        conn = sqlite3.connect(DB_NAME)
+        c = conn.cursor()
+        c.execute('''CREATE TABLE IF NOT EXISTS audit_logs (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        date TEXT, time TEXT, symbol TEXT, price REAL,
+                        vwap REAL, rsi REAL, vol_surge TEXT, ema_cross TEXT,
+                        nifty_trend TEXT, status TEXT, reason TEXT)''')
+        c.execute('''CREATE TABLE IF NOT EXISTS trades (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        date TEXT, time TEXT, symbol TEXT, type TEXT,
+                        buy_price REAL, sell_price REAL, qty INTEGER, pnl REAL)''')
+        conn.commit()
+        conn.close()
+    except Exception:
+        pass
 
 init_db()
 
 def save_audit_log(date_str, time_str, sym, price, vwap, rsi, vol_surge, ema_cross, nifty_trend, status, reason):
     try:
-        conn = sqlite3.connect("trading_journal.db")
+        conn = sqlite3.connect(DB_NAME)
         c = conn.cursor()
         c.execute('''INSERT INTO audit_logs (date, time, symbol, price, vwap, rsi, vol_surge, ema_cross, nifty_trend, status, reason)
                      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
@@ -47,7 +52,7 @@ def save_audit_log(date_str, time_str, sym, price, vwap, rsi, vol_surge, ema_cro
 
 def save_trade_record(date_str, time_str, sym, t_type, bp, sp, qty, pnl):
     try:
-        conn = sqlite3.connect("trading_journal.db")
+        conn = sqlite3.connect(DB_NAME)
         c = conn.cursor()
         c.execute('''INSERT INTO trades (date, time, symbol, type, buy_price, sell_price, qty, pnl)
                      VALUES (?, ?, ?, ?, ?, ?, ?, ?)''',
@@ -91,7 +96,7 @@ capital_input = st.sidebar.number_input("ക്യാപിറ്റൽ (₹):",
 risk_input = st.sidebar.number_input("ഒരു ട്രേഡിലെ റിസ്ക് (₹):", value=float(state['risk']), step=25.0)
 
 tg_token_input = st.sidebar.text_input("Telegram Bot Token (Optional):", value=state['tg_token'], type="password")
-tg_chat_input = st.sidebar.text_input("Telegram Chat ID (Optional):", value=state['tg_chat'])
+tg_chat_input = st.sidebar.text_input("Telegram Chat ID (Optional):")
 
 def send_telegram(msg, tg_t, tg_c):
     if tg_t and tg_c:
@@ -139,7 +144,7 @@ def calculate_indicators(df):
     df['ATR'] = tr.rolling(window=14).mean()
     return df
 
-# ഇൻസ്റ്റിറ്റ്യൂഷണൽ ബാക്ക്ഗ്രൗണ്ട് ലൂപ്പ്
+# ബാക്ക്ഗ്രൗണ്ട് ലൂപ്പ്
 def background_trading_loop():
     while state['running']:
         token = state['token']
@@ -147,7 +152,6 @@ def background_trading_loop():
             time.sleep(5)
             continue
 
-        # 1. കിൽ സ്വിച്ച് പരിശോധന (തുടർച്ചയായ 2 നഷ്ടങ്ങൾ)
         if state['consecutive_losses'] >= 2:
             state['kill_switch'] = True
             state['running'] = False
@@ -155,10 +159,8 @@ def background_trading_loop():
             send_telegram(msg, state['tg_token'], state['tg_chat'])
             break
 
-        # 2. നിഫ്റ്റി ഇൻഡക്സ് ഫിൽട്ടർ പരിശോധന
         nifty_ok = check_nifty_bullish(token)
 
-        # 3. നിലവിലെ ട്രേഡ് ഉണ്ടെങ്കിൽ (45-മിനിറ്റ് ടൈം എക്സിറ്റ് & SL/Target)
         if state['active_pos']:
             pos = state['active_pos']
             df_cur = fetch_candles(pos['key'], token)
@@ -166,7 +168,6 @@ def background_trading_loop():
                 cur_p = float(df_cur['close'].iloc[-1])
                 elapsed_mins = (time.time() - pos['entry_time']) / 60.0
 
-                # 45 മിനിറ്റ് ടൈം എക്സിറ്റ് (മൂവ്മെന്റ് ഇല്ലാത്ത ഫ്ലാറ്റ് ട്രേഡ് ഒഴിവാക്കൽ)
                 if elapsed_mins >= 45 and (abs(cur_p - pos['buy_price']) / pos['buy_price']) < 0.005:
                     pnl = (cur_p - pos['buy_price']) * pos['qty']
                     save_trade_record(datetime.date.today().strftime("%Y-%m-%d"), datetime.datetime.now().strftime("%I:%M:%S %p"), pos['symbol'], "TIME_EXIT_45M", pos['buy_price'], cur_p, pos['qty'], round(pnl, 2))
@@ -185,7 +186,6 @@ def background_trading_loop():
                     state['consecutive_losses'] += 1
                     state['active_pos'] = None
 
-        # 4. പുതിയ അവസരങ്ങൾ സ്കാൻ ചെയ്യുന്നു
         if state['active_pos'] is None:
             for symbol, instrument_key in WATCHLIST.items():
                 if not state['running']: break
@@ -243,7 +243,6 @@ def background_trading_loop():
 
         time.sleep(10)
 
-# ബട്ടണുകൾ
 col1, col2 = st.sidebar.columns(2)
 if col1.button("▶️ START BOT", use_container_width=True):
     if not token_input:
@@ -285,40 +284,55 @@ tab1, tab2, tab3, tab4 = st.tabs([
     "📊 20 സ്റ്റോക്ക് മെഗാ ബാക്ക്ടെസ്റ്റ്"
 ])
 
+# ടാബ് 1: സുരക്ഷിതമായ റീഡിങ്
 with tab1:
     st.subheader("🟢 ഇന്നത്തെ തത്സമയ പ്രവർത്തനങ്ങളും നിഫ്റ്റി പരിശോധനയും")
-    conn = sqlite3.connect("trading_journal.db")
-    ist_zone = datetime.timezone(datetime.timedelta(hours=5, minutes=30))
-    today_str = datetime.datetime.now(ist_zone).strftime("%Y-%m-%d")
-    df_live = pd.read_sql_query(f"SELECT time AS Time, symbol AS Stock, price AS Price, vwap AS VWAP, rsi AS RSI, vol_surge AS [Vol Surge], nifty_trend AS [Nifty Sentiment], status AS Status, reason AS Reason FROM audit_logs WHERE date='{today_str}' ORDER BY id DESC LIMIT 50", conn)
-    conn.close()
-    if not df_live.empty:
-        st.dataframe(df_live, use_container_width=True, hide_index=True)
-    else:
+    try:
+        conn = sqlite3.connect(DB_NAME)
+        ist_zone = datetime.timezone(datetime.timedelta(hours=5, minutes=30))
+        today_str = datetime.datetime.now(ist_zone).strftime("%Y-%m-%d")
+        df_live = pd.read_sql_query(f"SELECT time AS Time, symbol AS Stock, price AS Price, vwap AS VWAP, rsi AS RSI, vol_surge AS [Vol Surge], nifty_trend AS [Nifty Sentiment], status AS Status, reason AS Reason FROM audit_logs WHERE date='{today_str}' ORDER BY id DESC LIMIT 50", conn)
+        conn.close()
+        if not df_live.empty:
+            st.dataframe(df_live, use_container_width=True, hide_index=True)
+        else:
+            st.info("സ്കാനിംഗ് ഡാറ്റ വരാൻ കാത്തിരിക്കുന്നു...")
+    except Exception:
         st.info("സ്കാനിംഗ് ഡാറ്റ വരാൻ കാത്തിരിക്കുന്നു...")
 
+# ടാബ് 2
 with tab2:
     st.subheader("📚 മുൻ ദിവസങ്ങളിലെ സമ്പൂർണ്ണ ട്രേഡിംഗ് ജേർണൽ")
-    conn = sqlite3.connect("trading_journal.db")
-    dates_df = pd.read_sql_query("SELECT DISTINCT date FROM audit_logs ORDER BY date DESC", conn)
-    if not dates_df.empty:
-        selected_date = st.selectbox("📅 തീയതി തിരഞ്ഞെടുക്കുക:", dates_df['date'].tolist())
-        if selected_date:
-            df_hist = pd.read_sql_query(f"SELECT time AS Time, symbol AS Stock, price AS Price, vwap AS VWAP, rsi AS RSI, nifty_trend AS [Nifty Trend], status AS Status, reason AS Reason FROM audit_logs WHERE date='{selected_date}' ORDER BY id DESC", conn)
-            st.dataframe(df_hist, use_container_width=True, hide_index=True)
-            st.download_button("📥 Excel (CSV) ഡൗൺലോഡ് ചെയ്യുക", df_hist.to_csv(index=False).encode('utf-8'), f"audit_{selected_date}.csv", "text/csv")
-    conn.close()
+    try:
+        conn = sqlite3.connect(DB_NAME)
+        dates_df = pd.read_sql_query("SELECT DISTINCT date FROM audit_logs ORDER BY date DESC", conn)
+        if not dates_df.empty:
+            selected_date = st.selectbox("📅 തീയതി തിരഞ്ഞെടുക്കുക:", dates_df['date'].tolist())
+            if selected_date:
+                df_hist = pd.read_sql_query(f"SELECT time AS Time, symbol AS Stock, price AS Price, vwap AS VWAP, rsi AS RSI, nifty_trend AS [Nifty Trend], status AS Status, reason AS Reason FROM audit_logs WHERE date='{selected_date}' ORDER BY id DESC", conn)
+                st.dataframe(df_hist, use_container_width=True, hide_index=True)
+                st.download_button("📥 Excel (CSV) ഡൗൺലോഡ് ചെയ്യുക", df_hist.to_csv(index=False).encode('utf-8'), f"audit_{selected_date}.csv", "text/csv")
+        else:
+            st.info("പഴയ ദിവസങ്ങളിലെ ഡാറ്റ ശേഖരിക്കപ്പെടാൻ ബോട്ട് പ്രവർത്തിപ്പിച്ചു തുടങ്ങുക.")
+        conn.close()
+    except Exception:
+        st.info("പഴയ ദിവസങ്ങളിലെ ഡാറ്റ ശേഖരിക്കപ്പെടാൻ ബോട്ട് പ്രവർത്തിപ്പിച്ചു തുടങ്ങുക.")
 
+# ടാബ് 3
 with tab3:
     st.subheader("📜 പൂർത്തിയായ ട്രേഡുകൾ")
-    conn = sqlite3.connect("trading_journal.db")
-    df_trades = pd.read_sql_query("SELECT date AS Date, time AS Time, symbol AS Stock, type AS Action, buy_price AS [Buy Price], sell_price AS [Sell Price], pnl AS PnL FROM trades ORDER BY id DESC", conn)
-    conn.close()
-    if not df_trades.empty:
-        st.dataframe(df_trades, use_container_width=True, hide_index=True)
-    else:
+    try:
+        conn = sqlite3.connect(DB_NAME)
+        df_trades = pd.read_sql_query("SELECT date AS Date, time AS Time, symbol AS Stock, type AS Action, buy_price AS [Buy Price], sell_price AS [Sell Price], pnl AS PnL FROM trades ORDER BY id DESC", conn)
+        conn.close()
+        if not df_trades.empty:
+            st.dataframe(df_trades, use_container_width=True, hide_index=True)
+        else:
+            st.info("ഇതുവരെ ട്രേഡുകൾ ഒന്നും നടന്നിട്ടില്ല.")
+    except Exception:
         st.info("ഇതുവരെ ട്രേഡുകൾ ഒന്നും നടന്നിട്ടില്ല.")
 
+# ടാബ് 4
 with tab4:
     st.subheader("📈 20 പ്രമുഖ നിഫ്റ്റി ഓഹരികളുടെ 5 വർഷത്തെ ബാക്ക്ടെസ്റ്റ്")
     if st.button("🚀 മെഗാ ബാക്ക്ടെസ്റ്റ് ആരംഭിക്കുക"):
@@ -329,7 +343,6 @@ with tab4:
                     df_b = yf.download(sym, period="5y", interval="1d", auto_adjust=True, progress=False)
                     if not df_b.empty and len(df_b) > 60:
                         close_b = df_b['Close'].to_numpy(dtype=float).flatten()
-                        net_p = (close_b[-1] - close_b[0]) * 5
                         bt_results.append({'Stock': sym.replace('.NS', ''), '5Y Return': f"{round(((close_b[-1]-close_b[0])/close_b[0])*100, 1)}%"})
                 except Exception: pass
             if bt_results:
