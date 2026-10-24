@@ -13,6 +13,15 @@ import yfinance as yf
 st.set_page_config(page_title="Autonomous Wealth OS & Algo Bot", layout="wide", page_icon="🏛️")
 
 # ==========================================
+# 🔑 URL-ൽ വരുന്ന Upstox കോഡ് ഉടൻ പിടിച്ചെടുക്കുന്നു (പാസ്‌കീക്ക് മുൻപേ!)
+# ==========================================
+if "pending_auth_code" not in st.session_state:
+    st.session_state["pending_auth_code"] = ""
+
+if "code" in st.query_params:
+    st.session_state["pending_auth_code"] = st.query_params["code"]
+
+# ==========================================
 # 🗄️ മൾട്ടി-യൂസർ പ്രൈവറ്റ് ഡാറ്റാബേസ് സെറ്റപ്പ്
 # ==========================================
 DB_NAME = "trading_journal_v3.db"
@@ -42,6 +51,9 @@ def init_db():
         c.execute('''CREATE TABLE IF NOT EXISTS manual_portfolio (
                         id INTEGER PRIMARY KEY AUTOINCREMENT,
                         user_hash TEXT, symbol TEXT, qty REAL, buy_price REAL, buy_date TEXT, notes TEXT)''')
+        c.execute('''CREATE TABLE IF NOT EXISTS user_settings (
+                        user_hash TEXT PRIMARY KEY, api_key TEXT, api_secret TEXT,
+                        redirect_uri TEXT, tg_token TEXT, tg_chat TEXT)''')
         conn.commit()
         conn.close()
     except Exception:
@@ -49,65 +61,110 @@ def init_db():
 
 init_db()
 
+def save_user_creds(u_hash, api_k, api_s, red_u, tg_t, tg_c):
+    try:
+        conn = get_db_connection()
+        c = conn.cursor()
+        c.execute('''INSERT OR REPLACE INTO user_settings (user_hash, api_key, api_secret, redirect_uri, tg_token, tg_chat)
+                     VALUES (?, ?, ?, ?, ?, ?)''', (u_hash, api_k, api_s, red_u, tg_t, tg_c))
+        conn.commit()
+        conn.close()
+    except Exception:
+        pass
+
+def load_user_creds(u_hash):
+    try:
+        conn = get_db_connection()
+        c = conn.cursor()
+        c.execute("SELECT api_key, api_secret, redirect_uri, tg_token, tg_chat FROM user_settings WHERE user_hash=?", (u_hash,))
+        row = c.fetchone()
+        conn.close()
+        if row:
+            return {'api_key': row[0], 'api_secret': row[1], 'redirect_uri': row[2], 'tg_token': row[3], 'tg_chat': row[4]}
+    except Exception:
+        pass
+    return None
+
 # ==========================================
 # 🔐 സ്വകാര്യ യൂസർ ലോക്കർ (Multi-User Isolation)
 # ==========================================
 @st.cache_resource
 def get_user_vault():
-    # ഓരോ യൂസറുടെയും രഹസ്യ ഹാഷ് അനുസരിച്ച് ബാക്ക്ഗ്രൗണ്ട് ബോട്ടുകളെ പ്രത്യേകം സൂക്ഷിക്കുന്നു
     return {}
 
 user_vault = get_user_vault()
 
 st.sidebar.markdown("# 🏛️ WEALTH OS")
+
+if st.session_state["pending_auth_code"]:
+    st.sidebar.success(f"✅ Upstox കോഡ് ലഭിച്ചു (`{st.session_state['pending_auth_code']}`)! താഴെ നിങ്ങളുടെ പാസ്‌കീ നൽകുക.")
+
 user_passkey = st.sidebar.text_input(
     "🔐 നിങ്ങളുടെ സ്വകാര്യ പാസ്‌കീ (Secret ID):",
     type="password",
-    help="നിങ്ങളുടെ ഡാറ്റയും ബോട്ടും മറ്റാരും കാണാതിരിക്കാൻ നിങ്ങൾക്ക് മാത്രം അറിയാവുന്ന ഒരു രഹസ്യ വാക്ക്/നമ്പർ നൽകുക (ഉദാ: anas@786)."
+    help="നിങ്ങളുടെ ഡാറ്റയും ബോട്ടും മറ്റാരും കാണാതിരിക്കാൻ നിങ്ങൾക്ക് മാത്രം അറിയാവുന്ന ഒരു രഹസ്യ വാക്ക്/നമ്പർ നൽകുക."
 )
 
 if not user_passkey:
-    st.warning("🔒 **സ്വകാര്യതയും സുരക്ഷയും (100% Data Privacy):** ഈ ആപ്പ് ഉപയോഗിക്കാൻ ഇടതുവശത്തെ സൈഡ്‌ബാറിൽ നിങ്ങൾക്ക് ഇഷ്ടമുള്ള ഒരു **രഹസ്യ പാസ്‌കീ (Secret ID)** നൽകുക. നിങ്ങളുടെ ടോക്കണുകളും ട്രേഡുകളും പോർട്ട്ഫോളിയോയും ആ പാസ്‌കീ നൽകുമ്പോൾ മാത്രമേ ദൃശ്യമാകൂ.")
+    if st.session_state["pending_auth_code"]:
+        st.info(f"🔑 **Upstox ലോഗിൻ കോഡ് ലഭിച്ചു (`{st.session_state['pending_auth_code']}`)!** ടോക്കൺ ഓട്ടോമാറ്റിക് ആയി ജനറേറ്റ് ചെയ്യാൻ ഇടതുവശത്തെ സൈഡ്‌ബാറിൽ നിങ്ങളുടെ **സ്വകാര്യ പാസ്‌കീ (Secret ID)** നൽകുക.")
+    else:
+        st.warning("🔒 **സ്വകാര്യതയും സുരക്ഷയും (100% Data Privacy):** ഈ ആപ്പ് ഉപയോഗിക്കാൻ ഇടതുവശത്തെ സൈഡ്‌ബാറിൽ നിങ്ങൾക്ക് ഇഷ്ടമുള്ള ഒരു **രഹസ്യ പാസ്‌കീ (Secret ID)** നൽകുക. നിങ്ങളുടെ ടോക്കണുകളും ട്രേഡുകളും പോർട്ട്ഫോളിയോയും ആ പാസ്‌കീ നൽകുമ്പോൾ മാത്രമേ ദൃശ്യമാകൂ.")
     st.stop()
 
-# യൂസറുടെ പാസ്‌കീ എൻക്രിപ്റ്റ് ചെയ്ത് സുരക്ഷിതമായ ഹാഷ് ആക്കുന്നു
 USER_HASH = hashlib.sha256(user_passkey.strip().encode()).hexdigest()[:16]
 
 if USER_HASH not in user_vault:
+    saved_c = load_user_creds(USER_HASH) or {}
     user_vault[USER_HASH] = {
         'running': False, 'token': '', 'capital': 5000.0, 'risk': 100.0,
-        'mode': 'പേപ്പർ ട്രേഡിംഗ് (സുരക്ഷിതം)', 'tg_token': '', 'tg_chat': '',
+        'mode': 'പേപ്പർ ട്രേഡിംഗ് (സുരക്ഷിതം)',
+        'tg_token': saved_c.get('tg_token', ''), 'tg_chat': saved_c.get('tg_chat', ''),
         'thread': None, 'consecutive_losses': 0, 'kill_switch': False,
         'nifty_status': 'പരിശോധിക്കുന്നു...', 'active_pos': None,
         'shariah_lock': False, 'last_order_error': '',
-        'api_key': '', 'api_secret': '', 'redirect_uri': ''
+        'api_key': saved_c.get('api_key', ''),
+        'api_secret': saved_c.get('api_secret', ''),
+        'redirect_uri': saved_c.get('redirect_uri', 'https://my-trading-bot-wyjcnfn2bprzd4ysp8riie.streamlit.app')
     }
 
 state = user_vault[USER_HASH]
 
 # ==========================================
-# 🔑 Upstox OAuth 2.0 ഓട്ടോമാറ്റിക് ടോക്കൺ ജനറേറ്റർ
+# ⚡ ഓട്ടോമാറ്റിക് ടോക്കൺ എക്സ്ചേഞ്ച് ഫങ്ക്ഷൻ
 # ==========================================
-query_params = st.query_params
-if "code" in query_params and state.get('api_key') and state.get('api_secret'):
-    auth_code = query_params["code"]
+def exchange_code_for_token(auth_code, api_k, api_s, red_u):
+    token_url = "https://api.upstox.com/v2/login/authorization/token"
+    headers = {'accept': 'application/json', 'Content-Type': 'application/x-www-form-urlencoded'}
+    payload = {
+        'code': auth_code.strip(),
+        'client_id': api_k.strip(),
+        'client_secret': api_s.strip(),
+        'redirect_uri': red_u.strip(),
+        'grant_type': 'authorization_code'
+    }
     try:
-        token_url = "https://api.upstox.com/v2/login/authorization/token"
-        headers = {'accept': 'application/json', 'Content-Type': 'application/x-www-form-urlencoded'}
-        payload = {
-            'code': auth_code,
-            'client_id': state['api_key'],
-            'client_secret': state['api_secret'],
-            'redirect_uri': state['redirect_uri'],
-            'grant_type': 'authorization_code'
-        }
         res = requests.post(token_url, headers=headers, data=payload, timeout=10)
-        if res.status_code == 200 and 'access_token' in res.json():
-            state['token'] = res.json()['access_token']
-            st.query_params.clear()
-            st.toast("✅ Upstox Access Token ഓട്ടോമാറ്റിക് ആയി ജനറേറ്റ് ചെയ്തു!", icon="🔑")
-    except Exception:
-        pass
+        res_data = res.json()
+        if res.status_code == 200 and 'access_token' in res_data:
+            return True, res_data['access_token']
+        else:
+            err_detail = res_data.get('errors', [{}])[0].get('message', str(res_data))
+            return False, err_detail
+    except Exception as e:
+        return False, str(e)
+
+# URL-ൽ കോഡ് വന്നിട്ടുണ്ടെങ്കിൽ തനിയെ ടോക്കൺ ആക്കി മാറ്റുന്നു!
+if st.session_state["pending_auth_code"] and state.get('api_key') and state.get('api_secret'):
+    code_to_use = st.session_state["pending_auth_code"]
+    st.session_state["pending_auth_code"] = ""
+    st.query_params.clear()
+    ok, result = exchange_code_for_token(code_to_use, state['api_key'], state['api_secret'], state['redirect_uri'])
+    if ok:
+        state['token'] = result
+        st.toast("🎉 Upstox Access Token ഓട്ടോമാറ്റിക് ആയി ജനറേറ്റ് ചെയ്തു!", icon="✅")
+    else:
+        st.sidebar.error(f"Auto-Token Error: {result}")
 
 # ==========================================
 # 👑 മാസ്റ്റർ ഗ്ലോബൽ സ്വിച്ച്
@@ -160,39 +217,44 @@ if main_menu == "⚡ ഇൻട്രാഡേ ട്രേഡിംഗ് ബോ
     if is_shariah:
         st.warning("🌙 **ശരീഅത്ത് വാച്ച്‌ലിസ്റ്റ് ആക്ടീവ്:** ബാങ്കിംഗ് ഓഹരികൾ (SBIN) ഒഴിവാക്കി TCS, INFY, SUNPHARMA, RELIANCE എന്നിവ മാത്രമാണ് സ്കാൻ ചെയ്യുന്നത്.")
 
-    # ഓട്ടോമാറ്റിക് ടോക്കൺ ജനറേറ്റർ ബോക്സ് (OAuth 2.0)
-    with st.expander("🔑 ഓട്ടോമാറ്റിക് ടോക്കൺ ജനറേറ്റർ (Upstox 1-Click Auto Login)"):
-        st.caption("ദിവസവും ടോക്കൺ കോപ്പി-പേസ്റ്റ് ചെയ്യുന്നതിന് പകരം ഇവിടെ API Key നൽകിയാൽ ഒറ്റ ക്ലിക്കിൽ ടോക്കൺ ഓട്ടോമാറ്റിക് ആയി എടുക്കാം.")
+    if state['token']:
+        st.success("✅ **Upstox Access Token റെഡിയാണ്!** ഇനി ഇടതുവശത്തെ സൈഡ്‌ബാറിൽ **▶️ START BOT** അമർത്താം.")
+
+    with st.expander("🔑 ഓട്ടോമാറ്റിക് ടോക്കൺ ജനറേറ്റർ (Upstox 1-Click Auto Login)", expanded=not bool(state['token'])):
+        st.caption("നിങ്ങളുടെ API Key-യും Secret-ഉം ഒരു തവണ നൽകി സേവ് ചെയ്താൽ, ദിവസവും ഒറ്റ ക്ലിക്കിൽ ടോക്കൺ ഓട്ടോമാറ്റിക് ആയി എടുക്കാം.")
         oa1, oa2, oa3 = st.columns(3)
         api_k = oa1.text_input("Upstox API Key:", value=state['api_key'], type="password")
         api_s = oa2.text_input("Upstox API Secret:", value=state['api_secret'], type="password")
-        red_u = oa3.text_input("Redirect URL (നിങ്ങളുടെ ഈ ആപ്പ് ലിങ്ക്):", value=state['redirect_uri'] if state['redirect_uri'] else "https://share.streamlit.io")
-        
-        if api_k and api_s and red_u:
+        red_u = oa3.text_input("Redirect URL (നിങ്ങളുടെ ഈ ആപ്പ് ലിങ്ക്):", value=state['redirect_uri'])
+
+        if api_k != state['api_key'] or api_s != state['api_secret'] or red_u != state['redirect_uri']:
             state['api_key'], state['api_secret'], state['redirect_uri'] = api_k.strip(), api_s.strip(), red_u.strip()
+            save_user_creds(USER_HASH, state['api_key'], state['api_secret'], state['redirect_uri'], state['tg_token'], state['tg_chat'])
+
+        if state['api_key'] and state['api_secret'] and state['redirect_uri']:
             encoded_redir = urllib.parse.quote(state['redirect_uri'], safe='')
             auth_url = f"https://api.upstox.com/v2/login/authorization/dialog?response_type=code&client_id={state['api_key']}&redirect_uri={encoded_redir}"
-            st.link_button("🚀 Step 1: Upstox-ൽ ലോഗിൻ ചെയ്ത് ഓട്ടോമാറ്റിക് ടോക്കൺ എടുക്കുക", auth_url)
             
-            manual_code = st.text_input("അല്ലെങ്കിൽ ലോഗിൻ ചെയ്ത ശേഷം URL-ൽ വരുന്ന 'code=' ഇവിടെ പേസ്റ്റ് ചെയ്യുക:")
-            if st.button("⚡ Generate Token Now") and manual_code:
-                try:
-                    token_url = "https://api.upstox.com/v2/login/authorization/token"
-                    headers = {'accept': 'application/json', 'Content-Type': 'application/x-www-form-urlencoded'}
-                    payload = {
-                        'code': manual_code.strip(), 'client_id': state['api_key'],
-                        'client_secret': state['api_secret'], 'redirect_uri': state['redirect_uri'],
-                        'grant_type': 'authorization_code'
-                    }
-                    res = requests.post(token_url, headers=headers, data=payload, timeout=10)
-                    if res.status_code == 200 and 'access_token' in res.json():
-                        state['token'] = res.json()['access_token']
-                        st.success("✅ ടോക്കൺ ഓട്ടോമാറ്റിക് ആയി സേവ് ചെയ്തു!")
+            # ഒരേ ടാബിൽ തന്നെ തുറക്കാൻ സഹായിക്കുന്ന ലിങ്ക് ബട്ടൺ
+            st.markdown(f'<a href="{auth_url}" target="_self" style="display:inline-block;padding:10px 20px;background-color:#FF4B4B;color:white;text-decoration:none;border-radius:8px;font-weight:bold;">🚀 ഇവിടെ ക്ലിക്ക് ചെയ്ത് Upstox-ൽ നിന്ന് ഓട്ടോമാറ്റിക് ടോക്കൺ എടുക്കുക</a>', unsafe_allow_html=True)
+            st.caption("💡 മുകളിലെ ചുവന്ന ബട്ടണിൽ ക്ലിക്ക് ചെയ്യുമ്പോൾ Upstox ലോഗിൻ വഴി തിരിച്ച് ഈ പേജിലേക്ക് തന്നെ വരികയും, നിങ്ങളുടെ പാസ്‌കീ നൽകുമ്പോൾ ടോക്കൺ തനിയെ സേവ് ആവുകയും ചെയ്യും!")
+
+            with st.form("manual_code_form"):
+                manual_code = st.text_input("അല്ലെങ്കിൽ URL-ൽ വരുന്ന 'code=' (അല്ലെങ്കിൽ മുഴുവൻ URL-ഉം) ഇവിടെ പേസ്റ്റ് ചെയ്യുക:", value=st.session_state.get("pending_auth_code", ""))
+                submitted = st.form_submit_button("⚡ Generate Token Now")
+                if submitted and manual_code:
+                    clean_code = manual_code.strip()
+                    if "code=" in clean_code:
+                        clean_code = clean_code.split("code=")[-1].split("&")[0]
+                    ok, res_msg = exchange_code_for_token(clean_code, state['api_key'], state['api_secret'], state['redirect_uri'])
+                    if ok:
+                        state['token'] = res_msg
+                        st.session_state["pending_auth_code"] = ""
+                        st.success("🎉 ടോക്കൺ ഓട്ടോമാറ്റിക് ആയി ജനറേറ്റ് ചെയ്ത് സൈഡ്‌ബാറിൽ സേവ് ചെയ്തു!")
+                        time.sleep(1)
                         st.rerun()
                     else:
-                        st.error("ടോക്കൺ എടുക്കുന്നതിൽ പിശക്. കോഡ് വീണ്ടും പരിശോധിക്കുക.")
-                except Exception as e:
-                    st.error(f"Error: {e}")
+                        st.error(f"❌ Upstox Error: {res_msg}")
 
     st.sidebar.markdown("---")
     st.sidebar.subheader("⚙️ ബോട്ട് കൺട്രോൾ പാനൽ")
@@ -455,6 +517,7 @@ if main_menu == "⚡ ഇൻട്രാഡേ ട്രേഡിംഗ് ബോ
             state['mode'] = mode_input
             state['tg_token'] = tg_token_input
             state['tg_chat'] = tg_chat_input
+            save_user_creds(USER_HASH, state['api_key'], state['api_secret'], state['redirect_uri'], state['tg_token'], state['tg_chat'])
             state['running'] = True
             state['kill_switch'] = False
             state['consecutive_losses'] = 0
