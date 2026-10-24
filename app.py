@@ -60,7 +60,7 @@ def save_trade_record(date_str, time_str, sym, t_type, bp, sp, qty, pnl):
         pass
 
 # ==========================================
-# 🧭 5 പ്രധാന മാസ്റ്റർ ഹബ്ബുകൾ (Navigation)
+# 🧭 6 പ്രധാന മാസ്റ്റർ ഹബ്ബുകൾ (Navigation)
 # ==========================================
 st.sidebar.title("🏦 വെൽത്ത് & ട്രേഡിംഗ് ഹബ്")
 main_menu = st.sidebar.radio(
@@ -70,7 +70,8 @@ main_menu = st.sidebar.radio(
         "🏛️ 50-Year Veteran ഇന്ത്യൻ നിക്ഷേപം",
         "📈 മികച്ച മ്യൂച്വൽ ഫണ്ടുകൾ (SIP)",
         "🌍 ആഗോള നിക്ഷേപം (US & Global Markets)",
-        "🥇 ഗോൾഡ്, സിൽവർ & റിയൽ എസ്റ്റേറ്റ് (REITs)"
+        "🥇 ഗോൾഡ്, സിൽവർ & റിയൽ എസ്റ്റേറ്റ് (REITs)",
+        "🌙 ശരീഅത്ത് & എത്തിക്കൽ നിക്ഷേപം (Halal Wealth)"
     ]
 )
 
@@ -303,20 +304,17 @@ elif main_menu == "🏛️ 50-Year Veteran ഇന്ത്യൻ നിക്ഷ
     st.caption("വാറൻ ബഫറ്റ് ശൈലി: കടമില്ലാത്ത, ശക്തമായ കുത്തകയുള്ള, എഐ (AI) ഭീഷണിയില്ലാത്ത കമ്പനികൾ.")
 
     v_tab1, v_tab2 = st.tabs(["🛡️ ഓൾ-വെതർ കുത്തകകൾ", "⚡ എഐ യുഗത്തിൽ കുതിക്കുന്നവ"])
-
     with v_tab1:
-        st.subheader("🛡️ ഓൾ-വെതർ കുത്തകകൾ (മാർക്കറ്റ് വീണാലും ഉറച്ചുനിൽക്കുന്നവ)")
         all_weather_stocks = [
-            {"Stock": "CDSL", "Moat": "റെഗുലേറ്ററി കുത്തക", "ROCE": "33.5%", "Debt": "0.0", "AI Risk": "🟢 പൂജ്യം", "Resilience": "⭐⭐⭐⭐⭐", "Thesis": "ഡിമാറ്റ് അക്കൗണ്ടുകൾ കൂടുമ്പോൾ ടോൾ ബൂത്ത് പോലെ ലാഭം."},
-            {"Stock": "CAMS", "Moat": "ഡാറ്റ കുത്തക", "ROCE": "44.2%", "Debt": "0.0", "AI Risk": "🟢 പൂജ്യം", "Resilience": "⭐⭐⭐⭐⭐", "Thesis": "70% മ്യൂച്വൽ ഫണ്ടുകളുടെയും ബാക്ക്-എൻഡ് നിയന്ത്രിക്കുന്നു."},
-            {"Stock": "HAL", "Moat": "പ്രതിരോധ കുത്തക", "ROCE": "31.8%", "Debt": "0.0", "AI Risk": "🟢 പൂജ്യം", "Resilience": "⭐⭐⭐⭐⭐", "Thesis": "വ്യോമസേനയ്ക്ക് ജെറ്റുകൾ നിർമ്മിക്കാൻ മറ്റൊരു ബദലില്ല."},
-            {"Stock": "ITC Limited", "Moat": "ഉപഭോക്തൃ കുത്തക", "ROCE": "39.1%", "Debt": "0.0", "AI Risk": "🟢 പൂജ്യം", "Resilience": "⭐⭐⭐⭐⭐", "Thesis": "ഭീമമായ ഫ്രീ ക്യാഷ് ഫ്ലോ, 3%+ ഡിവിഡന്റ് നൽകുന്ന സുരക്ഷിത താവളം."},
-            {"Stock": "Sun Pharma", "Moat": "ഇലാസ്തികതയില്ലാത്ത ഫാർമ", "ROCE": "17.8%", "Debt": "0.05", "AI Risk": "🟢 പൂജ്യം", "Resilience": "⭐⭐⭐⭐", "Thesis": "അസുഖങ്ങൾക്ക് മരുന്ന് കഴിക്കാതിരിക്കാൻ മനുഷ്യർക്ക് കഴിയില്ല."}
+            {"Stock": "CDSL", "Moat": "റെഗുലേറ്ററി കുത്തക", "ROCE": "33.5%", "Debt": "0.0", "AI Risk": "🟢 പൂജ്യം", "Resilience": "⭐⭐⭐⭐⭐"},
+            {"Stock": "CAMS", "Moat": "ഡാറ്റ കുത്തക", "ROCE": "44.2%", "Debt": "0.0", "AI Risk": "🟢 പൂജ്യം", "Resilience": "⭐⭐⭐⭐⭐"},
+            {"Stock": "HAL", "Moat": "പ്രതിരോധ കുത്തക", "ROCE": "31.8%", "Debt": "0.0", "AI Risk": "🟢 പൂജ്യം", "Resilience": "⭐⭐⭐⭐⭐"},
+            {"Stock": "ITC Limited", "Moat": "ഉപഭോക്തൃ കുത്തക", "ROCE": "39.1%", "Debt": "0.0", "AI Risk": "🟢 പൂജ്യം", "Resilience": "⭐⭐⭐⭐⭐"},
+            {"Stock": "Sun Pharma", "Moat": "ഇലാസ്തികതയില്ലാത്ത ഫാർമ", "ROCE": "17.8%", "Debt": "0.05", "AI Risk": "🟢 പൂജ്യം", "Resilience": "⭐⭐⭐⭐"}
         ]
         st.dataframe(pd.DataFrame(all_weather_stocks), use_container_width=True, hide_index=True)
 
     with v_tab2:
-        st.subheader("⚡ എഐ യുഗത്തിൽ ഡിമാൻഡ് ഇരട്ടിയാകുന്ന വൻകിട കമ്പനികൾ")
         ai_beneficiaries = [
             {"Stock": "Power Grid", "Moat": "പവർ ട്രാൻസ്മിഷൻ കുത്തക", "Why AI Drives?": "AI ഡാറ്റാ സെന്ററുകൾക്ക് ഹൈ-വോൾട്ടേജ് പവർ എത്തിക്കാൻ മറ്റൊരു ബദലില്ല.", "Yield": "3.5%+"},
             {"Stock": "NTPC", "Moat": "വൈദ്യുതി ഉൽപ്പാദകൻ", "Why AI Drives?": "സെർവറുകൾക്ക് ആവശ്യമായ ബേസ്‌ലോഡ് പവറും ഗ്രീൻ എനർജിയും നൽകുന്നു.", "Yield": "3.0%+"},
@@ -333,24 +331,23 @@ elif main_menu == "📈 മികച്ച മ്യൂച്വൽ ഫണ്ട
     st.caption("ദീർഘകാലത്തേക്ക് സ്ഥിരതയോടെ കോടികളുടെ വെൽത്ത് സൃഷ്ടിക്കാൻ തെരഞ്ഞെടുത്ത ഫണ്ടുകൾ.")
 
     mf_category = st.selectbox("നിക്ഷേപ വിഭാഗം തിരഞ്ഞെടുക്കുക:", ["🌟 ഫ്ലെക്സി ക്യാപ് ഫണ്ടുകൾ", "🛡️ ലാർജ് ക്യാപ് & ഇൻഡെക്സ് ഫണ്ടുകൾ", "🚀 മിഡ് & സ്മോൾ ക്യാപ് ഫണ്ടുകൾ"])
-
     if "ഫ്ലെക്സി ക്യാപ്" in mf_category:
         funds = [
-            {"Fund Name": "Parag Parikh Flexi Cap Fund", "3Y CAGR": "21.5%", "5Y CAGR": "24.2%", "Expense Ratio": "0.62%", "Risk": "മിതമായ റിസ്ക്"},
-            {"Fund Name": "HDFC Flexi Cap Fund", "3Y CAGR": "25.1%", "5Y CAGR": "22.8%", "Expense Ratio": "0.85%", "Risk": "മിതമായ റിസ്ക്"},
-            {"Fund Name": "JM Flexicap Fund", "3Y CAGR": "32.0%", "5Y CAGR": "26.4%", "Expense Ratio": "0.55%", "Risk": "ഉയർന്ന വളർച്ച"}
+            {"Fund Name": "Parag Parikh Flexi Cap Fund", "3Y CAGR": "21.5%", "5Y CAGR": "24.2%", "Expense Ratio": "0.62%"},
+            {"Fund Name": "HDFC Flexi Cap Fund", "3Y CAGR": "25.1%", "5Y CAGR": "22.8%", "Expense Ratio": "0.85%"},
+            {"Fund Name": "JM Flexicap Fund", "3Y CAGR": "32.0%", "5Y CAGR": "26.4%", "Expense Ratio": "0.55%"}
         ]
         st.dataframe(pd.DataFrame(funds), use_container_width=True, hide_index=True)
     elif "ലാർജ് ക്യാപ്" in mf_category:
         funds = [
-            {"Fund Name": "UTI Nifty 50 Index Fund", "3Y CAGR": "15.8%", "5Y CAGR": "16.5%", "Expense Ratio": "0.18%", "Risk": "കുറഞ്ഞ റിസ്ക്"},
-            {"Fund Name": "HDFC Top 100 Fund", "3Y CAGR": "21.2%", "5Y CAGR": "18.2%", "Expense Ratio": "0.98%", "Risk": "കുറഞ്ഞ റിസ്ക്"}
+            {"Fund Name": "UTI Nifty 50 Index Fund", "3Y CAGR": "15.8%", "5Y CAGR": "16.5%", "Expense Ratio": "0.18%"},
+            {"Fund Name": "HDFC Top 100 Fund", "3Y CAGR": "21.2%", "5Y CAGR": "18.2%", "Expense Ratio": "0.98%"}
         ]
         st.dataframe(pd.DataFrame(funds), use_container_width=True, hide_index=True)
     else:
         funds = [
-            {"Fund Name": "Quant Small Cap Fund", "3Y CAGR": "34.2%", "5Y CAGR": "38.5%", "Expense Ratio": "0.77%", "Risk": "വളരെ ഉയർന്ന റിസ്ക്"},
-            {"Fund Name": "Nippon India Small Cap Fund", "3Y CAGR": "30.1%", "5Y CAGR": "32.4%", "Expense Ratio": "0.68%", "Risk": "ഉയർന്ന റിസ്ക്"}
+            {"Fund Name": "Quant Small Cap Fund", "3Y CAGR": "34.2%", "5Y CAGR": "38.5%", "Expense Ratio": "0.77%"},
+            {"Fund Name": "Nippon India Small Cap Fund", "3Y CAGR": "30.1%", "5Y CAGR": "32.4%", "Expense Ratio": "0.68%"}
         ]
         st.dataframe(pd.DataFrame(funds), use_container_width=True, hide_index=True)
 
@@ -360,7 +357,6 @@ elif main_menu == "📈 മികച്ച മ്യൂച്വൽ ഫണ്ട
     sip_amount = col_s1.number_input("പ്രതിമാസ SIP തുക (₹):", value=5000, step=1000)
     sip_years = col_s2.slider("കാലാവധി (വർഷങ്ങൾ):", min_value=1, max_value=30, value=10)
     sip_rate = col_s3.slider("പ്രതീക്ഷിക്കുന്ന ലാഭം (% CAGR):", min_value=8, max_value=25, value=15)
-
     months = sip_years * 12
     monthly_rate = (sip_rate / 100) / 12
     total_invested = sip_amount * months
@@ -396,7 +392,6 @@ elif main_menu == "🌍 ആഗോള നിക്ഷേപം (US & Global Marke
         stock_cagr = c_col2.slider("പ്രതീക്ഷിക്കുന്ന യു.എസ് ഓഹരി റിട്ടേൺ (% CAGR):", min_value=8, max_value=25, value=12)
         usd_growth = c_col3.slider("പ്രതീക്ഷിക്കുന്ന ഡോളർ മൂല്യവർദ്ധനവ് (% വർഷം):", min_value=1, max_value=8, value=4)
         inv_period = st.slider("നിക്ഷേപ കാലയളവ് (വർഷങ്ങൾ):", min_value=1, max_value=25, value=10)
-
         combined_rate = ((1 + (stock_cagr / 100)) * (1 + (usd_growth / 100))) - 1
         final_inr = inv_inr * ((1 + combined_rate) ** inv_period)
         pure_stock_inr = inv_inr * ((1 + (stock_cagr / 100)) ** inv_period)
@@ -407,74 +402,112 @@ elif main_menu == "🌍 ആഗോള നിക്ഷേപം (US & Global Marke
         f3.metric("🎯 തിരികെ കിട്ടുന്ന തുക", f"₹{final_inr:,.0f}")
 
 # ##################################################################
-# 🥇 വിഭാഗം 5: ഗോൾഡ്, സിൽവർ & റിയൽ എസ്റ്റേറ്റ് (REITs) - NEW!
+# 🥇 വിഭാഗം 5: ഗോൾഡ്, സിൽവർ & റിയൽ എസ്റ്റേറ്റ് (REITs)
 # ##################################################################
 elif main_menu == "🥇 ഗോൾഡ്, സിൽവർ & റിയൽ എസ്റ്റേറ്റ് (REITs)":
     st.title("🥇 ഗോൾഡ്, സിൽവർ & റിയൽ എസ്റ്റേറ്റ് നിലവറ")
     st.caption("മാർക്കറ്റ് തകർച്ചകളിൽ കവചമാകുന്ന സ്വർണ്ണവും, ഭൂമി വാങ്ങാതെ വാടക വരുമാനം തരുന്ന റിയൽ എസ്റ്റേറ്റും (REITs).")
 
-    gold_tab1, gold_tab2, gold_tab3 = st.tabs([
-        "🥇 ഗോൾഡ് & സിൽവർ ഇ.ടി.എഫുകൾ",
-        "🏢 റിയൽ എസ്റ്റേറ്റ് വാടക വരുമാനം (REITs)",
-        "⚖️ ഓൾ-വെതർ പോർട്ട്ഫോളിയോ റീബാലൻസർ"
-    ])
-
+    gold_tab1, gold_tab2, gold_tab3 = st.tabs(["🥇 ഗോൾഡ് & സിൽവർ ഇ.ടി.എഫുകൾ", "🏢 റിയൽ എസ്റ്റേറ്റ് വാടക വരുമാനം (REITs)", "⚖️ ഓൾ-വെതർ പോർട്ട്ഫോളിയോ റീബാലൻസർ"])
     with gold_tab1:
-        st.subheader("🥇 ഇന്ത്യയിലെ ഏറ്റവും മികച്ച ഗോൾഡ് & സിൽവർ ഇ.ടി.എഫുകൾ")
         st.info("💡 **എന്തുകൊണ്ട് ഗോൾഡ് ഇ.ടി.എഫ്?** പണിക്കൂലിയോ ജിഎസ്ടിയോ ലോക്കർ വാടകയോ ഇല്ലാതെ 99.5% ശുദ്ധമായ 24K സ്വർണ്ണത്തിൽ നിക്ഷേപിക്കാം. 12 മാസം കഴിഞ്ഞാൽ വെറും 12.5% മാത്രമാണ് ലോങ്ങ്-ടേം നികുതി!")
-
         gold_data = [
-            {"Instrument": "Nippon India ETF Gold BeES (GOLDBEES)", "Asset": "Gold (സ്വർണ്ണം)", "Expense Ratio": "0.55%", "Liquidity": "⭐⭐⭐⭐⭐ (ഏറ്റവും ഉയർന്നത്)", "Why Choose?": "ഇന്ത്യയിലെ ഏറ്റവും ജനപ്രിയമായ ഗോൾഡ് ഇ.ടി.എഫ്. 1 സെക്കൻഡിൽ പണമാക്കാം."},
-            {"Instrument": "HDFC Gold ETF (HDFCGOLD)", "Asset": "Gold (സ്വർണ്ണം)", "Expense Ratio": "0.30%", "Liquidity": "⭐⭐⭐⭐ (High)", "Why Choose?": "കുറഞ്ഞ ചെലവ് (Low Expense Ratio), വിശ്വസനീയമായ ഫണ്ട് ഹൗസ്."},
-            {"Instrument": "ICICI Prudential Gold ETF (ICICIGOLD)", "Asset": "Gold (സ്വർണ്ണം)", "Expense Ratio": "0.45%", "Liquidity": "⭐⭐⭐⭐ (High)", "Why Choose?": "കുറഞ്ഞ ട്രാക്കിംഗ് എറർ."},
-            {"Instrument": "Nippon India Silver ETF (SILVERBEES)", "Asset": "Silver (വെള്ളി)", "Expense Ratio": "0.50%", "Liquidity": "⭐⭐⭐⭐⭐ (Highest)", "Why Choose?": "ഇലക്ട്രിക് വാഹനങ്ങൾ, സോളാർ, AI ചിപ്പുകൾ എന്നിവയിൽ വെള്ളിയുടെ ഇൻഡസ്ട്രിയൽ ഡിമാൻഡ് വർദ്ധിക്കുന്നു."}
+            {"Instrument": "Nippon India ETF Gold BeES (GOLDBEES)", "Asset": "Gold", "Expense Ratio": "0.55%", "Liquidity": "⭐⭐⭐⭐⭐"},
+            {"Instrument": "HDFC Gold ETF (HDFCGOLD)", "Asset": "Gold", "Expense Ratio": "0.30%", "Liquidity": "⭐⭐⭐⭐"},
+            {"Instrument": "Nippon India Silver ETF (SILVERBEES)", "Asset": "Silver", "Expense Ratio": "0.50%", "Liquidity": "⭐⭐⭐⭐⭐"}
         ]
         st.dataframe(pd.DataFrame(gold_data), use_container_width=True, hide_index=True)
 
     with gold_tab2:
-        st.subheader("🏢 റിയൽ എസ്റ്റേറ്റ് നിക്ഷേപം (REITs - വാടക അക്കൗണ്ടിലേക്ക്)")
-        st.markdown("""
-        **ഭൂമി വാങ്ങാതെ എങ്ങനെ റിയൽ എസ്റ്റേറ്റ് ഉടമയാകാം?**
-        ഇന്ത്യയിലെ പ്രമുഖ ഐടി പാർക്കുകളിലും ഷോപ്പിംഗ് മാളുകളിലും വെറും **₹300 - ₹400 രൂപയ്ക്ക്** ഉടമസ്ഥാവകാശം നേടാം. ഇവർക്ക് ലഭിക്കുന്ന വാടകയുടെ 90% തുക **ഓരോ 3 മാസത്തിലും നിങ്ങളുടെ ബാങ്കിലേക്ക് ഡിവിഡന്റായി** തരുന്നു!
-        """)
-
         reit_data = [
-            {"REIT Name": "Embassy Office Parks REIT", "Type": "ഐടി പാർക്കുകൾ & ഓഫീസുകൾ", "Dividend Yield (%)": "6.8% - 7.5%", "Top Tenants": "Google, IBM, Microsoft, Cisco", "Payout": "ഓരോ 3 മാസത്തിലും (Quarterly)"},
-            {"REIT Name": "Nexus Select Trust", "Type": "ഷോപ്പിംഗ് മാളുകൾ (Retail Malls)", "Dividend Yield (%)": "7.5% - 8.2%", "Top Tenants": "Zara, PVR, Reliance Retail", "Payout": "ഓരോ 3 മാസത്തിലും (Quarterly)"},
-            {"REIT Name": "Brookfield India Real Estate Trust", "Type": "പ്രീമിയം കൊമേഴ്‌സ്യൽ ഓഫീസുകൾ", "Dividend Yield (%)": "7.2% - 8.0%", "Top Tenants": "Barclays, TCS, Cognizant", "Payout": "ഓരോ 3 മാസത്തിലും (Quarterly)"}
+            {"REIT Name": "Embassy Office Parks REIT", "Type": "ഐടി പാർക്കുകൾ & ഓഫീസുകൾ", "Dividend Yield (%)": "6.8% - 7.5%", "Top Tenants": "Google, IBM, Microsoft"},
+            {"REIT Name": "Nexus Select Trust", "Type": "ഷോപ്പിംഗ് മാളുകൾ", "Dividend Yield (%)": "7.5% - 8.2%", "Top Tenants": "Zara, PVR, Reliance Retail"}
         ]
         st.dataframe(pd.DataFrame(reit_data), use_container_width=True, hide_index=True)
 
     with gold_tab3:
-        st.subheader("⚖️ റേ ഡാലിയോ 'ഓൾ-വെതർ' പോർട്ട്ഫോളിയോ റീബാലൻസർ")
-        st.caption("ഏത് ആഗോള മാന്ദ്യത്തിലും സമ്പത്ത് സുരക്ഷിതമായി സൂക്ഷിക്കാൻ പണം എങ്ങനെ വീതിക്കണം?")
-
-        total_savings = st.number_input("നിങ്ങളുടെ കയ്യിലുള്ള മൊത്തം നിക്ഷേപ തുക (₹):", value=100000, step=10000)
-
-        # 50-വർഷത്തെ വിദഗ്ദ്ധ അലോക്കേഷൻ
-        eq_in = total_savings * 0.40  # 40% ഇന്ത്യൻ ഓഹരികൾ & ഫണ്ടുകൾ
-        eq_us = total_savings * 0.20  # 20% യു.എസ് കുത്തകകൾ
-        gold_al = total_savings * 0.15 # 15% ഗോൾഡ് & സിൽവർ ഇ.ടി.എഫ്
-        reit_al = total_savings * 0.10 # 10% റിയൽ എസ്റ്റേറ്റ് (REITs)
-        cash_al = total_savings * 0.15 # 15% എമർജൻസി ലിക്വിഡ് ക്യാഷ് (മാർക്കറ്റ് വീഴുമ്പോൾ വാങ്ങാൻ)
-
+        total_savings = st.number_input("നിക്ഷേപ തുക (₹):", value=100000, step=10000)
         al1, al2, al3 = st.columns(3)
-        al1.metric("🇮🇳 ഇന്ത്യൻ ഓഹരികൾ & MF (40%)", f"₹{eq_in:,.0f}")
-        al2.metric("🇺🇸 യു.എസ് വാൾസ്ട്രീറ്റ് (20%)", f"₹{eq_us:,.0f}")
-        al3.metric("🥇 ഗോൾഡ് & സിൽവർ ഇ.ടി.എഫ് (15%)", f"₹{gold_al:,.0f}")
-
+        al1.metric("🇮🇳 ഇന്ത്യൻ ഓഹരികൾ & MF (40%)", f"₹{(total_savings*0.4):,.0f}")
+        al2.metric("🇺🇸 യു.എസ് വാൾസ്ട്രീറ്റ് (20%)", f"₹{(total_savings*0.2):,.0f}")
+        al3.metric("🥇 ഗോൾഡ് & സിൽവർ ഇ.ടി.എഫ് (15%)", f"₹{(total_savings*0.15):,.0f}")
         al4, al5 = st.columns(2)
-        al4.metric("🏢 റിയൽ എസ്റ്റേറ്റ് REITs (10%)", f"₹{reit_al:,.0f}")
-        al5.metric("💵 ക്രാഷ് ക്യാഷ് / സേവിങ്സ് (15%)", f"₹{cash_al:,.0f}")
+        al4.metric("🏢 റിയൽ എസ്റ്റേറ്റ് REITs (10%)", f"₹{(total_savings*0.1):,.0f}")
+        al5.metric("💵 ക്രാഷ് ക്യാഷ് / സേവിങ്സ് (15%)", f"₹{(total_savings*0.15):,.0f}")
 
-        st.success(f"""
-        🎯 **നിക്ഷേപ പദ്ധതി:**
-        * ₹{eq_in:,.0f} - ഇന്ത്യൻ കുത്തകകളിലും ഫ്ലെക്സി ക്യാപ് ഫണ്ടിലും.
-        * ₹{eq_us:,.0f} - യു.എസ് S&P 500 / Big Tech കുത്തകകളിൽ (ഡോളർ നേട്ടത്തിന്).
-        * ₹{gold_al:,.0f} - GOLDBEES / SILVERBEES-ൽ (മാർക്കറ്റ് തകർച്ചയ്ക്കെതിരെയുള്ള എയർബാഗ്).
-        * ₹{reit_al:,.0f} - Embassy / Nexus REIT-ൽ (സ്ഥിരമായ 7-8% വാടക വരുമാനത്തിന്).
-        * ₹{cash_al:,.0f} - സേവിങ്സ് അക്കൗണ്ടിലോ ലിക്വിഡ് ഫണ്ടിലോ (മാർക്കറ്റ് 25% വീഴുമ്പോൾ കൂടുതൽ വാങ്ങാൻ).
+# ##################################################################
+# 🌙 വിഭാഗം 6: ശരീഅത്ത് & എത്തിക്കൽ നിക്ഷേപം (Halal Wealth Hub) - NEW!
+# ##################################################################
+elif main_menu == "🌙 ശരീഅത്ത് & എത്തിക്കൽ നിക്ഷേപം (Halal Wealth)":
+    st.title("🌙 ശരീഅത്ത് & എത്തിക്കൽ വെൽത്ത് ഹബ് (Halal Investing)")
+    st.caption("ഇസ്‌ലാമിക ശരീഅത്ത് നിയമങ്ങൾക്ക് വിധേയമായി, 50-വർഷത്തെ വിദഗ്ദ്ധ തത്വങ്ങൾ പാലിക്കുന്ന ഹലാൽ നിക്ഷേപങ്ങൾ.")
+
+    st.success("✅ **ശരീഅത്ത് തത്വം:** പലിശയില്ലാത്ത (Zero Riba), കടബാധ്യത കുറഞ്ഞ (Debt < 33%), സമൂഹത്തിന് ഹാനികരമല്ലാത്ത ശുദ്ധമായ ബിസിനസ്സുകളിൽ മാത്രം നിക്ഷേപിക്കുക.")
+
+    h_tab1, h_tab2, h_tab3, h_tab4 = st.tabs([
+        "🇮🇳 ഇന്ത്യൻ ടോപ്പ് ശരീഅത്ത് ഓഹരികൾ",
+        "🇺🇸 ആഗോള ഹലാൽ ഓഹരികൾ",
+        "📜 ഇസ്‌ലാമിക നിയമങ്ങളും ട്രേഡിംഗ് വിധികളും",
+        "🕋 എത്തിക്കൽ ഫണ്ടുകൾ & ഗോൾഡ്"
+    ])
+
+    with h_tab1:
+        st.subheader("🇮🇳 ഇന്ത്യയിലെ ഏറ്റവും മികച്ച ശരീഅത്ത് ഓഹരികൾ (Nifty Shariah)")
+        st.markdown("""
+        **50-വർഷത്തെ വിദഗ്ദ്ധ ഫിൽട്ടർ:**
+        പൂർണ്ണമായും കടരഹിതമായ, ഉയർന്ന ROCE ഉള്ള, ഇസ്‌ലാമിക പണ്ഡിതന്മാരുടെ നിരീക്ഷണത്തിലുള്ള കമ്പനികൾ:
         """)
+
+        halal_indian = [
+            {"Stock": "Tata Consultancy Services (TCS)", "Sector": "IT Services", "Debt": "0.0 (കടരഹിതം)", "ROCE (%)": "58.2%", "Shariah Status": "✅ 100% Compliant", "Why Invest?": "ഇന്ത്യയിലെ ഏറ്റവും വലിയ ഐടി കമ്പനി, ഭീമമായ ക്യാഷ് ഫ്ലോ, ഉയർന്ന ഡിവിഡന്റ്."},
+            {"Stock": "Tata Elxsi", "Sector": "High-Tech Design / EV", "Debt": "0.0 (കടരഹിതം)", "ROCE (%)": "42.5%", "Shariah Status": "✅ 100% Compliant", "Why Invest?": "ഇലക്ട്രിക് വാഹന സോഫ്റ്റ്‌വെയറിലും AI ഡിസൈനിലും വിപണി മേധാവിത്വം."},
+            {"Stock": "Cipla Limited", "Sector": "Pharmaceuticals", "Debt": "0.02 (നെഗ്ലിജിബിൾ)", "ROCE (%)": "24.1%", "Shariah Status": "✅ 100% Compliant", "Why Invest?": "ആഗോള തലത്തിൽ ജീവൻരക്ഷാ മരുന്നുകൾ നിർമ്മിക്കുന്ന വിശ്വസനീയ കമ്പനി."},
+            {"Stock": "Asian Paints", "Sector": "Consumer / Paints", "Debt": "0.05", "ROCE (%)": "34.0%", "Shariah Status": "✅ 100% Compliant", "Why Invest?": "ഇന്ത്യയിലെ പെയിന്റ് വിപണിയുടെ 50% കൈയ്യാളുന്ന അത്യുഗ്രൻ കുത്തക."},
+            {"Stock": "Polycab India", "Sector": "Cables & Wires", "Debt": "0.01", "ROCE (%)": "28.5%", "Shariah Status": "✅ 100% Compliant", "Why Invest?": "ഇന്ത്യയുടെ വികസനത്തിൽ വീടുകൾക്കും ഇൻഫ്രാസ്ട്രക്ചറിനും കേബിളുകൾ നൽകുന്ന ഭീമൻ."}
+        ]
+        st.dataframe(pd.DataFrame(halal_indian), use_container_width=True, hide_index=True)
+
+    with h_tab2:
+        st.subheader("🇺🇸 ആഗോള ഹലാൽ വമ്പന്മാർ (Global Halal Monopolies)")
+        st.markdown("""
+        ആഗോള ഇസ്‌ലാമിക ഇ.ടി.എഫുകളായ **SPUS**, **HLAL** എന്നിവയിൽ മുൻനിരയിൽ നിൽക്കുന്ന കടബാധ്യത കുറഞ്ഞ ആഗോള ഭീമന്മാർ:
+        """)
+
+        halal_global = [
+            {"Company": "Nvidia (NVDA)", "Sector": "AI Computing / Hardware", "Shariah Status": "✅ Compliant", "Moat": "AI കമ്പ്യൂട്ടിംഗ് ചിപ്പുകളിലെ ആഗോള കുത്തക. പലിശ വരുമാനമില്ലാത്ത ശുദ്ധമായ ഹാർഡ്‌വെയർ ബിസിനസ്സ്."},
+            {"Company": "Microsoft (MSFT)", "Sector": "Enterprise Software", "Shariah Status": "✅ Compliant (Filtered)", "Moat": "ലോകത്തെ എല്ലാ ഓഫീസുകളും പ്രവർത്തിക്കുന്ന സോഫ്റ്റ്‌വെയർ ശൃംഖല."},
+            {"Company": "Alphabet (Google)", "Sector": "Search & Cloud", "Shariah Status": "✅ Compliant", "Moat": "സൗജന്യ അറിവും യൂട്യൂബും വഴി പരസ്യ വരുമാനം നേടുന്ന കുത്തക."},
+            {"Company": "Johnson & Johnson (JNJ)", "Sector": "Healthcare & MedTech", "Shariah Status": "✅ Compliant", "Moat": "ആഗോള ആരോഗ്യ സംരക്ഷണ വിപണിയിലെ അതികായന്മാർ."}
+        ]
+        st.dataframe(pd.DataFrame(halal_global), use_container_width=True, hide_index=True)
+
+    with h_tab3:
+        st.subheader("📜 ഇസ്‌ലാമിക വിധികൾ: ട്രേഡിംഗ് vs ഇൻവെസ്റ്റ്മെന്റ്")
+        st.markdown("""
+        **ആഗോള ഇസ്‌ലാമിക പണ്ഡിത സഭകളുടെ (AAOIFI, OIC Fiqh Academy) വ്യക്തമായ വിധികൾ:**
+
+        1. **❌ ഫ്യൂച്ചേഴ്സ് & ഓപ്ഷൻസ് (F&O / Derivatives) - പൂർണ്ണമായും ഹറാം:**
+           * കയ്യിലില്ലാത്തത് വിൽക്കൽ (Gharar), അമിതമായ ഊഹക്കച്ചവടവും ചൂതാട്ടവും (Qimar) വരുന്നതിനാൽ ഡെറിവേറ്റീവ്സ് ഇസ്‌ലാമിൽ അനുവദനീയമല്ല.
+        2. **❌ ലിവറേജും ഇൻട്രാഡേ ഷോർട്ട് സെല്ലിംഗും - വിലക്കപ്പെട്ടത്:**
+           * ബ്രോക്കറുടെ കയ്യിൽ നിന്ന് കടമെടുത്ത് (Leverage) വ്യാപാരം ചെയ്യുന്നതും, കയ്യിലില്ലാത്ത ഓഹരികൾ വിൽക്കുന്നതും (Short Selling) അനുവദനീയമല്ല.
+        3. **✅ ഡെലിവറി ഇക്വിറ്റി ഇൻവെസ്റ്റ്മെന്റ് (Cash Delivery) - 100% ഹലാൽ:**
+           * സ്വന്തം പണം നൽകി ഒരു കമ്പനിയുടെ ഓഹരികൾ വാങ്ങി, അത് ഡിമാറ്റ് അക്കൗണ്ടിൽ ഉടമസ്ഥാവകാശം (Qabd) നേടി ലാഭത്തിലോ നഷ്ടത്തിലോ പങ്കാളിയാകുന്നത് പൂർണ്ണമായും അനുവദനീയമാണ്.
+        4. **💧 ലാഭ ശുദ്ധീകരണം (Purification):**
+           * കമ്പനിയുടെ പക്കൽ ബാങ്ക് ഡിപ്പോസിറ്റുകളിൽ നിന്നുള്ള ചെറിയ പലിശ വരുമാനം (5%-ൽ താഴെ) വന്നിട്ടുണ്ടെങ്കിൽ, ആ അനുപാതത്തിലുള്ള തുക സ്വന്തം ആവശ്യങ്ങൾക്ക് ഉപയോഗിക്കാതെ പാവങ്ങൾക്ക് ദാനം ചെയ്യണം.
+        """)
+
+    with h_tab4:
+        st.subheader("🕋 ഇന്ത്യയിലെ ശരീഅത്ത് മ്യൂച്വൽ ഫണ്ടുകളും ഗോൾഡും")
+        st.markdown("""
+        ടെൻഷനില്ലാതെ മാസം തോറും (SIP) ഹലാൽ രീതിയിൽ നിക്ഷേപിക്കാൻ പറ്റിയ ലൈസൻസുള്ള ഇന്ത്യൻ ഫണ്ടുകൾ:
+        """)
+
+        ethical_funds = [
+            {"Fund Name": "Tata Ethical Fund", "Type": "Shariah Equity Mutual Fund", "3Y CAGR": "20.8%", "5Y CAGR": "22.5%", "Shariah Board": "ശരീഅത്ത് സമിതിയുടെ നിരന്തര മേൽനോട്ടം", "Details": "ഇന്ത്യയിലെ ഏറ്റവും പഴയതും വലുതുമായ ശരീഅത്ത് ഫണ്ട്. പലിശ ബാങ്കുകളിലോ മദ്യ കമ്പനികളിലോ നിക്ഷേപിക്കില്ല."},
+            {"Fund Name": "Taurus Ethical Fund", "Type": "Shariah Equity Mutual Fund", "3Y CAGR": "22.1%", "5Y CAGR": "21.2%", "Shariah Board": "S&P BSE 500 Shariah ഇൻഡക്സ് ട്രാക്കിംഗ്", "Details": "കർശനമായ ഇസ്‌ലാമിക ഫിൽട്ടറിംഗ് നടത്തുന്ന പ്യുവർ ഇക്വിറ്റി ഫണ്ട്."},
+            {"Fund Name": "Nippon Gold BeES / HDFC Gold", "Type": "Physical Gold ETF", "Purity": "99.5% 24K Physical Gold", "AAOIFI Standard": "സ്റ്റാൻഡേർഡ് 57 പ്രകാരം അനുവദനീയം", "Details": "100% യഥാർത്ഥ സ്വർണ്ണം ലോക്കറുകളിൽ സൂക്ഷിച്ചിട്ടുള്ളതിനാൽ പേപ്പർ ഗോൾഡ് പോലെയല്ല, അനുവദനീയമാണ്."}
+        ]
+        st.dataframe(pd.DataFrame(ethical_funds), use_container_width=True, hide_index=True)
 
 # റൺ ചെയ്യുമ്പോൾ ഓട്ടോ റിഫ്രഷ്
 if main_menu == "⚡ ഇൻട്രാഡേ ട്രേഡിംഗ് ബോട്ട്" and state['running']:
