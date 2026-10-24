@@ -31,9 +31,13 @@ An institutional-grade, multi-asset wealth management and algorithmic execution 
 * **45-Minute Stale Momentum Exit:** Auto-liquidates flat, non-trending trades at cost to prevent end-of-day decay.
 * **3:15 PM Penalty Enforcement:** Guaranteed square-off prior to broker auto-square-off penalties.
 
+---
+
 ### 2. 🎯 Dynamic Goal & Macro Climate Sentinel
 * **Time-Horizon Engine:** Flexible allocation models across **1-Year (Tactical), 3-5 Year (Growth), and 10+ Year (Generational)** horizons.
 * **Crisis Sentinel:** Dynamically shifts marginal capital allocations between Equities, Gold, and Liquid Cash based on geopolitical tensions, crude oil spikes, and market regimes.
+
+---
 
 ### 3. 💼 Live Demat Holdings Sync & Exit Sentinel
 * Integrates seamlessly with broker portfolios via Upstox API v2 (`/v2/portfolio/long-term-holdings`).
@@ -43,10 +47,14 @@ An institutional-grade, multi-asset wealth management and algorithmic execution 
   * Capital allocation decay / Debt-to-equity breaches
   * Severe technical breakdown (200-day EMA violations)
 
+---
+
 ### 4. 🌙 100% Zero-Compromise Shariah Engine
 * Built strictly according to **AAOIFI Standards** (Standard #57 for Gold, financial threshold screens: Debt < 33%, Interest securities < 33%, Non-halal revenue < 5%).
 * Master toggle enables an immediate system-wide lock eliminating conventional banking, interest-bearing instruments, and non-permissible equities.
 * Features dedicated research on **Nifty Shariah leaders, Global Halal Titans (SPUS/HLAL), and Tata Ethical Fund**.
+
+---
 
 ### 5. 🌍 Global Wealth & Currency Arbitrage Hub
 * Curated research on the **Magnificent 7 & Berkshire Hathaway**.
@@ -74,6 +82,7 @@ An institutional-grade, multi-asset wealth management and algorithmic execution 
 * An active Upstox Developer Account (for live API access).
 
 ### Execution Commands
+
 ```bash
 # 1. Clone the repository
 git clone https://github.com/anasvkvp/my-trading-bot.git
@@ -84,18 +93,3 @@ pip install -r requirements.txt
 
 # 3. Launch the platform
 streamlit run app.py
-```
-The application will open automatically in your browser at http://localhost:8501.
-🔒 Security & Privacy Architecture
-Zero Credential Persistence: API Keys, Access Tokens, and personal client data are never committed to this repository.
-Ephemeral In-Memory Handling: Runtime tokens reside strictly within temporary server RAM sessions and communicate via encrypted HTTPS protocols.
-Separation of Concerns: The open-source code represents pure algorithmic logic and financial formulas; your portfolio balances and private credentials remain strictly confidential.
-⚖️ Regulatory & Legal Disclaimers (SEBI & Financial Disclosures)
-IMPORTANT NOTICE:
-This software platform is developed strictly for educational, research, and self-directed personal use.
-Non-Advisory Status: The author and contributors are not SEBI-registered Investment Advisers (RIA) or Research Analysts (RA). None of the content, formulas, or curated lists constitute personal financial advice or a solicitation to buy or sell securities.
-Market Risk: Equities, derivatives, and algorithmic trading carry substantial capital risk. Past algorithmic backtest performances do not guarantee future live returns.
-Self-Directed Execution: All trading and investment executions initiated through broker APIs remain entirely at the discretion and sole responsibility of the individual account holder.
-Shariah Verification: While screening rules align with global AAOIFI guidelines, investors are advised to cross-verify compliance based on their individual scholarly guidance.
-📄 License
-This project is open-source and distributed under the MIT License.
