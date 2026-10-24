@@ -1451,3 +1451,56 @@ elif main_menu == MENU_ITEMS[11]:
 # 💬 MODULE 12: USER FEEDBACK (PRIVATE TELEGRAM & PUBLIC BOARD)
 # ##################################################################
 elif main_
+elif main_menu == MENU_ITEMS[12]:
+    st.title("💬 അഭിപ്രായങ്ങളും നിർദ്ദേശങ്ങളും സംശയങ്ങളും (User Feedback, Q&A & Bug Report)")
+    st.warning("🔒 **സ്വകാര്യത മുന്നറിയിപ്പ്:** പൊതുവായ ഫീഡ്‌ബാക്ക് ബോർഡിൽ നിങ്ങളുടെ ഫോൺ നമ്പറോ വ്യക്തിപരമായ ലോൺ വിവരങ്ങളോ എഴുതരുത്. അഡ്മിന് മാത്രം കാണാനായി താഴെയുള്ള 'Send Privately' ടിക്ക് ചെയ്യുക.")
+    fb_col1, fb_col2 = st.columns([2, 1])
+    with fb_col1:
+        with st.form("user_feedback_form"):
+            u_name = st.text_input("നിങ്ങളുടെ പേര് (Optional):", placeholder="ഉദാ: Muhammed / Anonymous")
+            fb_cat = st.selectbox("വിഭാഗം തിരഞ്ഞെടുക്കുക:", [
+                "💡 പുതിയ ഫീച്ചർ നിർദ്ദേശം (Feature Suggestion)",
+                "🐞 ആപ്പിലെ പോരായ്മ / എറർ അറിയിക്കുക (Bug / Issue Report)",
+                "❓ സംശയങ്ങൾ / ചോദ്യങ്ങൾ (Question / Doubt)",
+                "⭐ പൊതുവായ അഭിപ്രായം (General Review)"
+            ])
+            fb_rating = st.select_slider("റേറ്റിംഗ്:", options=["⭐ 1", "⭐⭐ 2", "⭐⭐⭐ 3", "⭐⭐⭐⭐ 4", "⭐⭐⭐⭐⭐ 5 (മികച്ചത്)"], value="⭐⭐⭐⭐⭐ 5 (മികച്ചത്)")
+            is_private_fb = st.checkbox("🔒 ഇത് അഡ്മിന് മാത്രം സ്വകാര്യമായി അയക്കുക (പബ്ലിക് ബോർഡിൽ കാണിക്കരുത്)")
+            fb_msg = st.text_area("നിങ്ങളുടെ അഭിപ്രായം / ചോദ്യം ഇവിടെ വിശദമായി എഴുതുക:")
+            fb_sub = st.form_submit_button("📨 അഭിപ്രായം സമർപ്പിക്കുക (Submit Feedback)", type="primary")
+
+            if fb_sub and fb_msg.strip():
+                now_str = datetime.datetime.now().strftime("%Y-%m-%d %I:%M %p")
+                if not is_private_fb:
+                    conn = get_db_connection()
+                    conn.execute("INSERT INTO user_feedback (date, name, category, rating, message) VALUES (?, ?, ?, ?, ?)",
+                                 (now_str, u_name.strip() or "Anonymous User", fb_cat, fb_rating, fb_msg.strip()))
+                    conn.commit()
+                    conn.close()
+                if state.get('tg_token') and state.get('tg_chat'):
+                    try:
+                        tg_text = f"📬 *New Feedback ({'PRIVATE' if is_private_fb else 'PUBLIC'})*\n👤 *From:* {u_name or 'Anon'}\n📂 *Type:* {fb_cat}\n⭐ *Rating:* {fb_rating}\n📝 *Message:* {fb_msg.strip()}"
+                        requests.post(f"https://api.telegram.org/bot{state['tg_token']}/sendMessage", json={"chat_id": state['tg_chat'], "text": tg_text, "parse_mode": "Markdown"}, timeout=5)
+                    except Exception:
+                        pass
+                st.success("🎉 നന്ദി! നിങ്ങളുടെ അഭിപ്രായം വിജയകരമായി രേഖപ്പെടുത്തി!")
+
+    with fb_col2:
+        st.info("### 🐙 GitHub Issues\nകോഡുമായി ബന്ധപ്പെട്ട നിർദ്ദേശങ്ങൾ GitHub വഴിയും അറിയിക്കാം:")
+        st.link_button("🐞 Open GitHub Issues", "https://github.com/anasvkvp/my-trading-bot/issues", use_container_width=True)
+
+    conn = get_db_connection()
+    df_fb = pd.read_sql_query("SELECT date AS Date, name AS Name, category AS Category, rating AS Rating, message AS [Feedback / Question] FROM user_feedback ORDER BY id DESC LIMIT 30", conn)
+    conn.close()
+    if not df_fb.empty:
+        st.dataframe(df_fb, use_container_width=True, hide_index=True)
+
+# ==============================================================================
+# ⚖️ MANDATORY GLOBAL REGULATORY FOOTER (DISPLAYED AT THE BOTTOM OF EVERY PAGE)
+# ==============================================================================
+st.markdown("---")
+st.warning("""
+⚖️ **നിയമപരമായ മുന്നറിയിപ്പ് (SEBI & RBI Regulatory Disclaimer — Educational Purpose Only):**  
+1. **നോൺ-അഡ്വൈസറി സ്റ്റാറ്റസ് (No Financial Advice):** ഈ സോഫ്റ്റ്‌വെയർ പ്ലാറ്റ്‌ഫോം (**Autonomous Wealth OS**) പൂർണ്ണമായും **വിദ്യാഭ്യാസം, ഗണിതശാസ്ത്ര ഗവേഷണം, സ്വയം പഠനം (Educational & Quantitative Research Purpose)** എന്നിവയ്ക്ക് വേണ്ടി മാത്രം നിർമ്മിച്ചിട്ടുള്ളതാണ്. ഇതിന്റെ നിർമ്മാതാക്കൾ **SEBI** രജിസ്റ്റർ ചെയ്ത ഇൻവെസ്റ്റ്‌മെന്റ് അഡ്വൈസർമാരോ (RIA), റിസർച്ച് അനലിസ്റ്റുകളോ (RA), അല്ലെങ്കിൽ **RBI** അംഗീകൃത ധനകാര്യ സ്ഥാപനമോ അല്ല.  
+2. **വ്യക്തിഗത ഉത്തരവാദിത്തം (Self-Directed Decision):** ഇതിൽ കാണുന്ന അൽഗോറിതമിക് സ്റ്റോക്ക് സ്ക്രീനറുകൾ, റെക്കമെൻഡേഷൻ പട്ടികകൾ, ഐ.പി.ഒ / മ്യൂച്വൽ ഫണ്ട് ഡാറ്റ എന്നിവയൊന്നും തന്നെ ഏതെങ്കിലും ഓഹരി വാങ്ങാനോ വിൽക്കാനോ ഉള്ള വ്യക്തിഗത ശുപാർശയല്ല. നിക്ഷേപിക്കുന്നതിന് മുൻപ് നിങ്ങൾ സ്വയം പഠിക്കുകയും, അംഗീകൃത സാമ്പത്തിക വിദഗ്ദ്ധരുടെ ഉപദേശം തേടുകയും ചെയ്യുക.
+""")
