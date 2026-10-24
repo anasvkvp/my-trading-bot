@@ -6,18 +6,24 @@ import datetime
 import time
 import threading
 import sqlite3
+import urllib.parse
 import yfinance as yf
 
 st.set_page_config(page_title="Autonomous Wealth OS & Algo Bot", layout="wide", page_icon="🏛️")
 
 # ==========================================
-# 🗄️ ഡാറ്റാബേസ് സെറ്റപ്പ്
+# 🗄️ ഡാറ്റാബേസ് സെറ്റപ്പ് (WAL Mode സഹിതം)
 # ==========================================
 DB_NAME = "trading_journal_v2.db"
 
+def get_db_connection():
+    conn = sqlite3.connect(DB_NAME, timeout=15)
+    conn.execute("PRAGMA journal_mode=WAL;")  # ഒരേ സമയം എഴുതാനും വായിക്കാനും സഹായിക്കുന്നു
+    return conn
+
 def init_db():
     try:
-        conn = sqlite3.connect(DB_NAME)
+        conn = get_db_connection()
         c = conn.cursor()
         c.execute('''CREATE TABLE IF NOT EXISTS audit_logs (
                         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -67,75 +73,102 @@ main_menu = st.sidebar.radio(
     ]
 )
 
-WATCHLIST = {
+# മോഡ് അനുസരിച്ച് വാച്ച്‌ലിസ്റ്റ് മാറുന്നു (ശരീഅത്ത് മോഡിൽ ബാങ്കിംഗ് സ്റ്റോക്കുകൾ ഒഴിവാക്കി)
+WATCHLIST_CONVENTIONAL = {
     'SBIN': 'NSE_EQ|INE062A01020',
     'RELIANCE': 'NSE_EQ|INE002A01018',
     'BHARTIARTL': 'NSE_EQ|INE397D01024',
     'LT': 'NSE_EQ|INE018A01030'
 }
+
+WATCHLIST_SHARIAH = {
+    'TCS': 'NSE_EQ|INE467B01029',
+    'INFY': 'NSE_EQ|INE009A01021',
+    'SUNPHARMA': 'NSE_EQ|INE044A01036',
+    'RELIANCE': 'NSE_EQ|INE002A01018'
+}
+
 NIFTY_KEY = 'NSE_INDEX|Nifty 50'
 
 @st.cache_resource
 def get_global_state():
     return {
         'running': False, 'token': '', 'capital': 5000.0, 'risk': 100.0,
-        'mode': 'പേപ്പർ ട്രേഡിംഗ്', 'tg_token': '', 'tg_chat': '',
+        'mode': 'പേപ്പർ ട്രേഡിംഗ് (സുരക്ഷിതം)', 'tg_token': '', 'tg_chat': '',
         'thread': None, 'consecutive_losses': 0, 'kill_switch': False,
-        'nifty_status': 'പരിശോധിക്കുന്നു...', 'active_pos': None
+        'nifty_status': 'പരിശോധിക്കുന്നു...', 'active_pos': None,
+        'shariah_lock': False, 'last_order_error': ''
     }
 
 state = get_global_state()
+state['shariah_lock'] = is_shariah
 
 # ##################################################################
-# ⚡ വിഭാഗം 1: ഇൻട്രാഡേ ട്രേഡിംഗ് ബോട്ട് (പൂർണ്ണമായി പുനഃസ്ഥാപിച്ചു)
+# ⚡ വിഭാഗം 1: ഇൻട്രാഡേ ട്രേഡിംഗ് ബോട്ട്
 # ##################################################################
 if main_menu == "⚡ ഇൻട്രാഡേ ട്രേഡിംഗ് ബോട്ട് (Active Algo Engine)":
     st.title("⚡ Upstox ഇൻസ്റ്റിറ്റ്യൂഷണൽ ഇൻട്രാഡേ ബോട്ട്")
-    st.caption("Nifty Trend Guard + Kill Switch + 45-Min Stale Exit + 3:15 PM Auto Square-off.")
+    st.caption("Nifty Trend Guard + Kill Switch + Capital Cap + 45-Min Stale Exit + 3:15 PM Auto Square-off.")
 
     if is_shariah:
-        st.error("⚠️ **ശരീഅത്ത് മുന്നറിയിപ്പ്:** ഇൻട്രാഡേ ലിവറേജും F&O-യും ഇസ്‌ലാമിക പണ്ഡിതന്മാർ വിലക്കിയിട്ടുള്ളതാണ്. ശരീഅത്ത് നിക്ഷേപകർ ദീർഘകാല ഡെലിവറി ഇക്വിറ്റിയും എത്തിക്കൽ ഫണ്ടുകളും മാത്രം തിരഞ്ഞെടുക്കുക.")
+        st.warning("🌙 **ശരീഅത്ത് വാച്ച്‌ലിസ്റ്റ് ആക്ടീവ്:** ബാങ്കിംഗ് ഓഹരികൾ (SBIN) ഒഴിവാക്കി TCS, INFY, SUNPHARMA, RELIANCE എന്നിവ മാത്രമാണ് സ്കാൻ ചെയ്യുന്നത്. (ശ്രദ്ധിക്കുക: ഇൻട്രാഡേയിൽ ലിവറേജ് എടുക്കാതെ സ്വന്തം ക്യാപിറ്റൽ മാത്രം ഉപയോഗിക്കുക).")
 
     st.sidebar.markdown("---")
     st.sidebar.subheader("⚙️ ബോട്ട് കൺട്രോൾ പാനൽ")
-    mode_input = st.sidebar.radio("ട്രേഡിംഗ് മോഡ്:", ["പേപ്പർ ട്രേഡിംഗ് (സുരക്ഷിതം)", "ലൈവ് റിയൽ മണി"], index=0 if state['mode']=="പേപ്പർ ട്രേഡിംഗ് (സുരക്ഷിതം)" else 1)
+    mode_input = st.sidebar.radio("ട്രേഡിംഗ് മോഡ്:", ["പേപ്പർ ട്രേഡിംഗ് (സുരക്ഷിതം)", "ലൈവ് റിയൽ മണി"], index=0 if "പേപ്പർ" in state['mode'] else 1)
     token_input = st.sidebar.text_input("Upstox Access Token നൽകുക:", value=state['token'], type="password")
-    capital_input = st.sidebar.number_input("ക്യാപിറ്റൽ (₹):", value=float(state['capital']), step=500.0)
-    risk_input = st.sidebar.number_input("ഒരു ട്രേഡിലെ റിസ്ക് (₹):", value=float(state['risk']), step=25.0)
+    capital_input = st.sidebar.number_input("ക്യാപിറ്റൽ (₹):", value=float(state['capital']), min_value=500.0, step=500.0)
+    risk_input = st.sidebar.number_input("ഒരു ട്രേഡിലെ റിസ്ക് (₹):", value=float(state['risk']), min_value=10.0, step=25.0)
 
     tg_token_input = st.sidebar.text_input("Telegram Bot Token (Optional):", value=state['tg_token'], type="password")
     tg_chat_input = st.sidebar.text_input("Telegram Chat ID (Optional):", value=state['tg_chat'])
 
     def send_telegram(msg, tg_t, tg_c):
         if tg_t and tg_c:
-            try: requests.post(f"https://api.telegram.org/bot{tg_t}/sendMessage", json={"chat_id": tg_c, "text": msg, "parse_mode": "Markdown"}, timeout=5)
-            except Exception: pass
+            try:
+                requests.post(f"https://api.telegram.org/bot{tg_t}/sendMessage", json={"chat_id": tg_c, "text": msg, "parse_mode": "Markdown"}, timeout=5)
+            except Exception:
+                pass
 
     def place_real_order(symbol, instrument_key, qty, action, token):
         if "ലൈവ് റിയൽ" in state['mode']:
             try:
                 url = 'https://api-hft.upstox.com/v2/order/place'
-                headers = {'Accept': 'application/json', 'Authorization': f'Bearer {token}'}
+                headers = {'Accept': 'application/json', 'Authorization': f'Bearer {token}', 'Content-Type': 'application/json'}
                 order_data = {
-                    "quantity": qty, "product": "I", "validity": "DAY", "price": 0,
-                    "tag": "AlgoBot", "instrument_token": instrument_key,
+                    "quantity": int(qty), "product": "I", "validity": "DAY", "price": 0,
+                    "tag": "WealthOS", "instrument_token": instrument_key,
                     "order_type": "MARKET", "transaction_type": action,
                     "disclosed_quantity": 0, "trigger_price": 0, "is_amo": False
                 }
-                res = requests.post(url, headers=headers, json=order_data, timeout=5)
-                return res.status_code == 200
-            except Exception: pass
-        return True
+                res = requests.post(url, headers=headers, json=order_data, timeout=7)
+                res_json = res.json()
+                if res.status_code == 200 and res_json.get('status') == 'success':
+                    state['last_order_error'] = ''
+                    return True
+                else:
+                    err_msg = res_json.get('errors', [{}])[0].get('message', 'Unknown Order Error')
+                    state['last_order_error'] = f"Order Failed ({symbol}): {err_msg}"
+                    send_telegram(f"⚠️ *ഓർഡർ പരാജയപ്പെട്ടു ({symbol}):* `{err_msg}`", state['tg_token'], state['tg_chat'])
+                    return False
+            except Exception as e:
+                state['last_order_error'] = f"Order Error: {str(e)}"
+                return False
+        return True  # പേപ്പർ ട്രേഡിംഗിൽ എപ്പോഴും True
 
     def fetch_candles(instrument_key, token):
         headers = {'Accept': 'application/json', 'Authorization': f'Bearer {token}'}
+        encoded_key = urllib.parse.quote(instrument_key, safe='')
         try:
-            res = requests.get(f"https://api.upstox.com/v2/historical-candle/intraday/{instrument_key}/1minute", headers=headers, timeout=10)
+            res = requests.get(f"https://api.upstox.com/v2/historical-candle/intraday/{encoded_key}/1minute", headers=headers, timeout=10)
             data = res.json()
-            if data.get('status') == 'success' and 'candles' in data['data']:
-                df = pd.DataFrame(data['data']['candles'], columns=['timestamp', 'open', 'high', 'low', 'close', 'volume', 'oi'])
-                return df.iloc[::-1].reset_index(drop=True)
-        except Exception: pass
+            if data.get('status') == 'success' and 'candles' in data.get('data', {}):
+                candles = data['data']['candles']
+                if len(candles) > 0:
+                    df = pd.DataFrame(candles, columns=['timestamp', 'open', 'high', 'low', 'close', 'volume', 'oi'])
+                    return df.iloc[::-1].reset_index(drop=True)
+        except Exception:
+            pass
         return None
 
     def check_nifty_bullish(token):
@@ -146,7 +179,8 @@ if main_menu == "⚡ ഇൻട്രാഡേ ട്രേഡിംഗ് ബോ
             is_bullish = close.iloc[-1] >= ema_20.iloc[-1]
             state['nifty_status'] = "🟢 ബുള്ളിഷ് (Positive)" if is_bullish else "🔴 ബെയറിഷ് (Negative)"
             return is_bullish
-        return True
+        state['nifty_status'] = "⚠️ ഡാറ്റ ലഭ്യമല്ല (Waiting)"
+        return False  # സുരക്ഷയ്ക്കായി ഡാറ്റ ഇല്ലെങ്കിൽ False നൽകുന്നു
 
     def calculate_indicators(df):
         close = df['close'].astype(float)
@@ -156,11 +190,29 @@ if main_menu == "⚡ ഇൻട്രാഡേ ട്രേഡിംഗ് ബോ
         df['EMA_Fast'] = close.ewm(span=9, adjust=False).mean()
         df['EMA_Slow'] = close.ewm(span=21, adjust=False).mean()
         df['Vol_SMA'] = volume.rolling(window=20).mean()
-        df['VWAP'] = (((high + low + close) / 3) * volume).cumsum() / volume.cumsum()
-        df['RSI'] = 100 - (100 / (1 + (close.diff().where(close.diff() > 0, 0).rolling(14).mean() / (-close.diff().where(close.diff() < 0, 0)).rolling(14).mean())))
+        vol_cumsum = volume.cumsum().replace(0, np.nan)
+        df['VWAP'] = (((high + low + close) / 3) * volume).cumsum() / vol_cumsum
+        
+        delta = close.diff()
+        gain = delta.where(delta > 0, 0.0).rolling(14).mean()
+        loss = (-delta.where(delta < 0, 0.0)).rolling(14).mean()
+        rs = gain / loss.replace(0, np.nan)
+        df['RSI'] = (100 - (100 / (1 + rs))).fillna(50.0)
+        
         tr = pd.concat([high - low, (high - close.shift()).abs(), (low - close.shift()).abs()], axis=1).max(axis=1)
         df['ATR'] = tr.rolling(window=14).mean()
         return df
+
+    def log_trade(date_s, time_s, sym, t_type, bp, sp, qty, pnl):
+        try:
+            conn = get_db_connection()
+            c = conn.cursor()
+            c.execute("INSERT INTO trades (date, time, symbol, type, buy_price, sell_price, qty, pnl) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                      (date_s, time_s, sym, t_type, round(bp, 2), round(sp, 2), int(qty), round(pnl, 2)))
+            conn.commit()
+            conn.close()
+        except Exception:
+            pass
 
     def background_trading_loop():
         while state['running']:
@@ -171,36 +223,35 @@ if main_menu == "⚡ ഇൻട്രാഡേ ട്രേഡിംഗ് ബോ
 
             ist_zone = datetime.timezone(datetime.timedelta(hours=5, minutes=30))
             now_ist = datetime.datetime.now(ist_zone)
-            market_close_time = datetime.time(15, 15)
+            curr_time_obj = now_ist.time()
 
-            # 3:15 PM ഓട്ടോ സ്ക്വയർ-ഓഫ് ഗാർഡ് (Upstox ₹50 പെനാൽറ്റി തടയാൻ)
-            if now_ist.time() >= market_close_time and state['active_pos']:
-                pos = state['active_pos']
-                df_cur = fetch_candles(pos['key'], token)
-                if df_cur is not None and len(df_cur) > 0:
-                    exit_p = float(df_cur['close'].iloc[-1])
-                    pnl = (exit_p - pos['buy_price']) * pos['qty']
-                    place_real_order(pos['symbol'], pos['key'], pos['qty'], "SELL", token)
-                    try:
-                        conn = sqlite3.connect(DB_NAME)
-                        c = conn.cursor()
-                        c.execute("INSERT INTO trades (date, time, symbol, type, buy_price, sell_price, qty, pnl) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-                                  (now_ist.strftime("%Y-%m-%d"), now_ist.strftime("%I:%M:%S %p"), pos['symbol'], "AUTO_315_EXIT", pos['buy_price'], exit_p, pos['qty'], round(pnl, 2)))
-                        conn.commit()
-                        conn.close()
-                    except Exception: pass
-                    send_telegram(f"⏰ *3:15 PM ഓട്ടോ സ്ക്വയർ-ഓഫ്:* `{pos['symbol']}` ക്ലോസ് ചെയ്തു. PnL: `₹{pnl:.2f}`", state['tg_token'], state['tg_chat'])
-                state['active_pos'] = None
-                break
+            market_entry_start = datetime.time(9, 20)   # 9:20 AM മുതലേ പുതിയ എൻട്രി എടുക്കൂ (ആദ്യ 5 മിനിറ്റ് ഒഴിവാക്കാൻ)
+            market_entry_cutoff = datetime.time(15, 5)  # 3:05 PM കഴിഞ്ഞാൽ പുതിയ BUY എടുക്കില്ല
+            market_close_time = datetime.time(15, 15)   # 3:15 PM ഓട്ടോ സ്ക്വയർ ഓഫ്
 
+            # 1. 3:15 PM ഓട്ടോ സ്ക്വയർ-ഓഫ് ഗാർഡ്
+            if curr_time_obj >= market_close_time:
+                if state['active_pos']:
+                    pos = state['active_pos']
+                    df_cur = fetch_candles(pos['key'], token)
+                    exit_p = float(df_cur['close'].iloc[-1]) if (df_cur is not None and len(df_cur) > 0) else pos['buy_price']
+                    if place_real_order(pos['symbol'], pos['key'], pos['qty'], "SELL", token):
+                        pnl = (exit_p - pos['buy_price']) * pos['qty']
+                        log_trade(now_ist.strftime("%Y-%m-%d"), now_ist.strftime("%I:%M:%S %p"), pos['symbol'], "AUTO_315_EXIT", pos['buy_price'], exit_p, pos['qty'], pnl)
+                        send_telegram(f"⏰ *3:15 PM ഓട്ടോ സ്ക്വയർ-ഓഫ്:* `{pos['symbol']}` ക്ലോസ് ചെയ്തു. PnL: `₹{pnl:.2f}`", state['tg_token'], state['tg_chat'])
+                        state['active_pos'] = None
+                state['nifty_status'] = "🌙 മാർക്കറ്റ് ക്ലോസ് ആയി (After 3:15 PM)"
+                time.sleep(15)
+                continue
+
+            # 2. കിൽ സ്വിച്ച് പരിശോധന
             if state['consecutive_losses'] >= 2:
                 state['kill_switch'] = True
                 state['running'] = False
                 send_telegram("🛑 *കിൽ സ്വിച്ച് ആക്റ്റീവ് ആയി!* തുടർച്ചയായി 2 നഷ്ടങ്ങൾ വന്നതിനാൽ ട്രേഡിംഗ് പൂർണ്ണമായി നിർത്തി.", state['tg_token'], state['tg_chat'])
                 break
 
-            nifty_ok = check_nifty_bullish(token)
-
+            # 3. നിലവിലുള്ള ട്രേഡ് (Active Position) നിരീക്ഷിക്കൽ
             if state['active_pos']:
                 pos = state['active_pos']
                 df_cur = fetch_candles(pos['key'], token)
@@ -208,61 +259,60 @@ if main_menu == "⚡ ഇൻട്രാഡേ ട്രേഡിംഗ് ബോ
                     cur_p = float(df_cur['close'].iloc[-1])
                     elapsed_mins = (time.time() - pos['entry_time']) / 60.0
 
+                    # 45 മിനിറ്റ് കഴിഞ്ഞിട്ടും അനക്കമില്ലെങ്കിൽ എക്സിറ്റ്
                     if elapsed_mins >= 45 and (abs(cur_p - pos['buy_price']) / pos['buy_price']) < 0.005:
-                        pnl = (cur_p - pos['buy_price']) * pos['qty']
-                        place_real_order(pos['symbol'], pos['key'], pos['qty'], "SELL", token)
-                        try:
-                            conn = sqlite3.connect(DB_NAME)
-                            c = conn.cursor()
-                            c.execute("INSERT INTO trades (date, time, symbol, type, buy_price, sell_price, qty, pnl) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-                                      (now_ist.strftime("%Y-%m-%d"), now_ist.strftime("%I:%M:%S %p"), pos['symbol'], "TIME_EXIT_45M", pos['buy_price'], cur_p, pos['qty'], round(pnl, 2)))
-                            conn.commit()
-                            conn.close()
-                        except Exception: pass
-                        send_telegram(f"⏳ *45m Dead Momentum Exit:* `{pos['symbol']}` ഒഴിവാക്കി. PnL: `₹{pnl:.2f}`", state['tg_token'], state['tg_chat'])
-                        state['active_pos'] = None
+                        if place_real_order(pos['symbol'], pos['key'], pos['qty'], "SELL", token):
+                            pnl = (cur_p - pos['buy_price']) * pos['qty']
+                            log_trade(now_ist.strftime("%Y-%m-%d"), now_ist.strftime("%I:%M:%S %p"), pos['symbol'], "TIME_EXIT_45M", pos['buy_price'], cur_p, pos['qty'], pnl)
+                            send_telegram(f"⏳ *45m Stale Momentum Exit:* `{pos['symbol']}` ഒഴിവാക്കി. PnL: `₹{pnl:.2f}`", state['tg_token'], state['tg_chat'])
+                            state['active_pos'] = None
+                    # ടാർജറ്റ് അടിച്ചാൽ
                     elif cur_p >= pos['target']:
-                        pnl = (cur_p - pos['buy_price']) * pos['qty']
-                        place_real_order(pos['symbol'], pos['key'], pos['qty'], "SELL", token)
-                        try:
-                            conn = sqlite3.connect(DB_NAME)
-                            c = conn.cursor()
-                            c.execute("INSERT INTO trades (date, time, symbol, type, buy_price, sell_price, qty, pnl) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-                                      (now_ist.strftime("%Y-%m-%d"), now_ist.strftime("%I:%M:%S %p"), pos['symbol'], "TARGET_HIT", pos['buy_price'], cur_p, pos['qty'], round(pnl, 2)))
-                            conn.commit()
-                            conn.close()
-                        except Exception: pass
-                        send_telegram(f"🎉 *TARGET HIT:* `{pos['symbol']}` ലാഭം: `+₹{pnl:.2f}`", state['tg_token'], state['tg_chat'])
-                        state['consecutive_losses'] = 0
-                        state['active_pos'] = None
+                        if place_real_order(pos['symbol'], pos['key'], pos['qty'], "SELL", token):
+                            pnl = (cur_p - pos['buy_price']) * pos['qty']
+                            log_trade(now_ist.strftime("%Y-%m-%d"), now_ist.strftime("%I:%M:%S %p"), pos['symbol'], "TARGET_HIT", pos['buy_price'], cur_p, pos['qty'], pnl)
+                            send_telegram(f"🎉 *TARGET HIT:* `{pos['symbol']}` ലാഭം: `+₹{pnl:.2f}`", state['tg_token'], state['tg_chat'])
+                            state['consecutive_losses'] = 0
+                            state['active_pos'] = None
+                    # സ്റ്റോപ്പ്-ലോസ് അടിച്ചാൽ
                     elif cur_p <= pos['sl']:
-                        pnl = (cur_p - pos['buy_price']) * pos['qty']
-                        place_real_order(pos['symbol'], pos['key'], pos['qty'], "SELL", token)
-                        try:
-                            conn = sqlite3.connect(DB_NAME)
-                            c = conn.cursor()
-                            c.execute("INSERT INTO trades (date, time, symbol, type, buy_price, sell_price, qty, pnl) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-                                      (now_ist.strftime("%Y-%m-%d"), now_ist.strftime("%I:%M:%S %p"), pos['symbol'], "STOP_LOSS", pos['buy_price'], cur_p, pos['qty'], round(pnl, 2)))
-                            conn.commit()
-                            conn.close()
-                        except Exception: pass
-                        send_telegram(f"🛑 *STOP LOSS HIT:* `{pos['symbol']}` നഷ്ടം: `₹{pnl:.2f}`", state['tg_token'], state['tg_chat'])
-                        state['consecutive_losses'] += 1
-                        state['active_pos'] = None
+                        if place_real_order(pos['symbol'], pos['key'], pos['qty'], "SELL", token):
+                            pnl = (cur_p - pos['buy_price']) * pos['qty']
+                            log_trade(now_ist.strftime("%Y-%m-%d"), now_ist.strftime("%I:%M:%S %p"), pos['symbol'], "STOP_LOSS", pos['buy_price'], cur_p, pos['qty'], pnl)
+                            send_telegram(f"🛑 *STOP LOSS HIT:* `{pos['symbol']}` നഷ്ടം: `₹{pnl:.2f}`", state['tg_token'], state['tg_chat'])
+                            state['consecutive_losses'] += 1
+                            state['active_pos'] = None
+
+            # 4. പുതിയ ട്രേഡ് സ്കാനിംഗ് (9:20 AM - 3:05 PM വരെ മാത്രം, തിങ്കൾ-വെള്ളി)
+            is_weekday = now_ist.weekday() < 5
+            is_trading_window = is_weekday and (market_entry_start <= curr_time_obj <= market_entry_cutoff)
+
+            if not is_trading_window:
+                if not is_weekday:
+                    state['nifty_status'] = "📅 അവധി ദിവസമാണ് (Weekend)"
+                elif curr_time_obj < market_entry_start:
+                    state['nifty_status'] = "⏳ 9:20 AM ആകാൻ കാത്തിരിക്കുന്നു..."
+                time.sleep(10)
+                continue
+
+            nifty_ok = check_nifty_bullish(token)
+            active_watchlist = WATCHLIST_SHARIAH if state['shariah_lock'] else WATCHLIST_CONVENTIONAL
 
             if state['active_pos'] is None:
-                for symbol, instrument_key in WATCHLIST.items():
-                    if not state['running']: break
+                for symbol, instrument_key in active_watchlist.items():
+                    if not state['running'] or state['active_pos'] is not None:
+                        break
                     df = fetch_candles(instrument_key, token)
-                    if df is None or len(df) < 30: continue
+                    if df is None or len(df) < 30:
+                        continue
 
                     df = calculate_indicators(df)
                     curr, prev = df.iloc[-1], df.iloc[-2]
                     curr_price = float(curr['close'])
                     vol_avg = float(curr['Vol_SMA']) if not np.isnan(curr['Vol_SMA']) else 0
-                    vwap = float(curr['VWAP'])
+                    vwap = float(curr['VWAP']) if not np.isnan(curr['VWAP']) else curr_price
                     rsi = float(curr['RSI'])
-                    atr = float(curr['ATR']) if not np.isnan(curr['ATR']) else (curr_price * 0.015)
+                    atr = float(curr['ATR']) if (not np.isnan(curr['ATR']) and curr['ATR'] > 0) else (curr_price * 0.01)
 
                     ema_cross = (prev['EMA_Fast'] <= prev['EMA_Slow']) and (curr['EMA_Fast'] > curr['EMA_Slow'])
                     rsi_safe = 50 <= rsi <= 68
@@ -272,22 +322,40 @@ if main_menu == "⚡ ഇൻട്രാഡേ ട്രേഡിംഗ് ബോ
                     curr_date = now_ist.strftime("%Y-%m-%d")
                     curr_time = now_ist.strftime("%I:%M:%S %p")
 
-                    if not nifty_ok: reason, status = "നിഫ്റ്റി ഇൻഡക്സ് താഴേക്കാണ്", "SKIPPED_NIFTY"
-                    elif not above_vwap: reason, status = "VWAP-ക്ക് താഴെയാണ് (Bearish)", "SKIPPED"
-                    elif not volume_surge: reason, status = "വോളിയം കുറവാണ്", "SKIPPED"
-                    elif not rsi_safe: reason, status = f"RSI അനുകൂലമല്ല ({rsi:.1f})", "SKIPPED"
-                    elif not ema_cross: reason, status = "EMA ക്രോസ് ആയിട്ടില്ല", "WAITING"
+                    if not nifty_ok:
+                        reason, status = "നിഫ്റ്റി ഇൻഡക്സ് ബുള്ളിഷ് അല്ല", "SKIPPED_NIFTY"
+                    elif not above_vwap:
+                        reason, status = "VWAP-ക്ക് താഴെയാണ് (Bearish)", "SKIPPED"
+                    elif not volume_surge:
+                        reason, status = "വോളിയം കുറവാണ്", "SKIPPED"
+                    elif not rsi_safe:
+                        reason, status = f"RSI അനുകൂലമല്ല ({rsi:.1f})", "SKIPPED"
+                    elif not ema_cross:
+                        reason, status = "EMA ക്രോസ് ആയിട്ടില്ല", "WAITING"
                     else:
-                        sl_p = curr_price - (1.5 * atr)
+                        sl_dist = max(0.5, 1.5 * atr)
+                        sl_p = curr_price - sl_dist
                         tg_p = curr_price + (3.0 * atr)
-                        qty = max(1, int(state['risk'] // (curr_price - sl_p)))
-                        state['active_pos'] = {'symbol': symbol, 'key': instrument_key, 'buy_price': curr_price, 'qty': qty, 'sl': sl_p, 'target': tg_p, 'entry_time': time.time()}
-                        place_real_order(symbol, instrument_key, qty, "BUY", token)
-                        reason, status = "ഫിൽട്ടറുകൾ പാസായി!", "🎯 BUY TRIGGERED"
-                        send_telegram(f"🚀 *BUY എടുത്തു:* `{symbol}` @ ₹{curr_price:.2f} | Target: ₹{tg_p:.2f} | SL: ₹{sl_p:.2f}", state['tg_token'], state['tg_chat'])
+                        
+                        # റിസ്കും ക്യാപിറ്റലും നോക്കി സുരക്ഷിതമായ എണ്ണം (Qty) എടുക്കുന്നു
+                        risk_based_qty = int(state['risk'] // sl_dist)
+                        max_affordable_qty = int(state['capital'] // curr_price)
+                        qty = max(1, min(risk_based_qty, max_affordable_qty))
+
+                        if curr_price > state['capital']:
+                            reason, status = f"ക്യാപിറ്റൽ തികയില്ല (വില: ₹{curr_price:.0f})", "SKIPPED_CAP"
+                        elif place_real_order(symbol, instrument_key, qty, "BUY", token):
+                            state['active_pos'] = {
+                                'symbol': symbol, 'key': instrument_key, 'buy_price': curr_price,
+                                'qty': qty, 'sl': sl_p, 'target': tg_p, 'entry_time': time.time()
+                            }
+                            reason, status = f"വാങ്ങി (Qty: {qty})", "🎯 BUY TRIGGERED"
+                            send_telegram(f"🚀 *BUY എടുത്തു:* `{symbol}` (Qty: {qty}) @ ₹{curr_price:.2f} | Target: ₹{tg_p:.2f} | SL: ₹{sl_p:.2f}", state['tg_token'], state['tg_chat'])
+                        else:
+                            reason, status = "ബ്രോക്കർ ഓർഡർ തള്ളി", "ORDER_FAILED"
 
                     try:
-                        conn = sqlite3.connect(DB_NAME)
+                        conn = get_db_connection()
                         c = conn.cursor()
                         c.execute('''INSERT INTO audit_logs (date, time, symbol, price, vwap, rsi, vol_surge, ema_cross, nifty_trend, status, reason)
                                      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
@@ -295,12 +363,18 @@ if main_menu == "⚡ ഇൻട്രാഡേ ട്രേഡിംഗ് ബോ
                                    "Yes" if volume_surge else "No", "Yes" if ema_cross else "No", state['nifty_status'], status, reason))
                         conn.commit()
                         conn.close()
-                    except Exception: pass
+                    except Exception:
+                        pass
+
+                    if state['active_pos'] is not None:
+                        break  # ഒരു ട്രേഡ് എടുത്താൽ ഉടൻ ലൂപ്പിൽ നിന്ന് പുറത്തുകടക്കുന്നു
+
             time.sleep(10)
 
     col1, col2 = st.sidebar.columns(2)
     if col1.button("▶️ START BOT", use_container_width=True):
-        if not token_input: st.sidebar.error("Access Token നൽകുക!")
+        if not token_input:
+            st.sidebar.error("Access Token നൽകുക!")
         else:
             state['token'] = token_input
             state['capital'] = capital_input
@@ -321,33 +395,50 @@ if main_menu == "⚡ ഇൻട്രാഡേ ട്രേഡിംഗ് ബോ
         state['running'] = False
         st.sidebar.warning("ബോട്ട് നിർത്തി!")
 
+    if state['last_order_error']:
+        st.error(f"🚨 ബ്രോക്കർ മുന്നറിയിപ്പ്: {state['last_order_error']}")
+
     m1, m2, m3, m4 = st.columns(4)
     m1.metric("ബോട്ട് സ്റ്റാറ്റസ്", "🟢 ബാക്ക്ഗ്രൗണ്ടിൽ ഓടുന്നു" if state['running'] else ("🛑 കിൽ സ്വിച്ച് ഓഫ്" if state['kill_switch'] else "🔴 ഓഫ് ആണ്"))
     m2.metric("നിഫ്റ്റി 50 ട്രെൻഡ്", state['nifty_status'])
     m3.metric("തുടർച്ചയായ നഷ്ടങ്ങൾ", f"{state['consecutive_losses']} / 2")
-    m4.metric("ക്യാപിറ്റൽ", f"₹{state['capital']:.2f}")
+    m4.metric("ക്യാപിറ്റൽ", f"₹{state['capital']:,.2f}")
+
+    if state['active_pos']:
+        ap = state['active_pos']
+        st.success(f"📌 **നിലവിലെ ലൈവ് ട്രേഡ്:** `{ap['symbol']}` | എണ്ണം: `{ap['qty']}` | വാങ്ങിയ വില: `₹{ap['buy_price']:.2f}` | ടാർജറ്റ്: `₹{ap['target']:.2f}` | സ്റ്റോപ്പ്-ലോസ്: `₹{ap['sl']:.2f}`")
 
     st.divider()
 
     t1, t2 = st.tabs(["🔍 ലൈവ് സ്കാനിംഗ് ലോഗ് & നിഫ്റ്റി ഗാർഡ്", "📜 പൂർത്തിയായ ട്രേഡുകൾ"])
     with t1:
         try:
-            conn = sqlite3.connect(DB_NAME)
+            conn = get_db_connection()
             today_str = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=5, minutes=30))).strftime("%Y-%m-%d")
-            df_live = pd.read_sql_query(f"SELECT time AS Time, symbol AS Stock, price AS Price, vwap AS VWAP, rsi AS RSI, nifty_trend AS [Nifty Sentiment], status AS Status, reason AS Reason FROM audit_logs WHERE date='{today_str}' ORDER BY id DESC LIMIT 50", conn)
+            df_live = pd.read_sql_query("SELECT time AS Time, symbol AS Stock, price AS Price, vwap AS VWAP, rsi AS RSI, nifty_trend AS [Nifty Sentiment], status AS Status, reason AS Reason FROM audit_logs WHERE date=? ORDER BY id DESC LIMIT 50", conn, params=(today_str,))
             conn.close()
-            if not df_live.empty: st.dataframe(df_live, use_container_width=True, hide_index=True)
-            else: st.info("സ്കാനിംഗ് ഡാറ്റ വരാൻ കാത്തിരിക്കുന്നു...")
-        except Exception: st.info("സ്കാനിംഗ് ഡാറ്റ വരാൻ കാത്തിരിക്കുന്നു...")
+            if not df_live.empty:
+                st.dataframe(df_live, use_container_width=True, hide_index=True)
+            else:
+                st.info("സ്കാനിംഗ് ഡാറ്റ വരാൻ കാത്തിരിക്കുന്നു (മാർക്കറ്റ് സമയം: 9:20 AM - 3:15 PM)...")
+        except Exception:
+            st.info("സ്കാനിംഗ് ഡാറ്റ വരാൻ കാത്തിരിക്കുന്നു...")
 
     with t2:
         try:
-            conn = sqlite3.connect(DB_NAME)
-            df_tr = pd.read_sql_query("SELECT date AS Date, time AS Time, symbol AS Stock, type AS Action, buy_price AS [Buy Price], sell_price AS [Sell Price], pnl AS PnL FROM trades ORDER BY id DESC", conn)
+            conn = get_db_connection()
+            df_tr = pd.read_sql_query("SELECT date AS Date, time AS Time, symbol AS Stock, type AS Action, qty AS Qty, buy_price AS [Buy Price], sell_price AS [Sell Price], pnl AS PnL FROM trades ORDER BY id DESC", conn)
             conn.close()
-            if not df_tr.empty: st.dataframe(df_tr, use_container_width=True, hide_index=True)
-            else: st.info("ഇതുവരെ ട്രേഡുകൾ ഒന്നും നടന്നിട്ടില്ല.")
-        except Exception: st.info("ട്രേഡുകൾ ഒന്നും നടന്നിട്ടില്ല.")
+            if not df_tr.empty:
+                st.dataframe(df_tr, use_container_width=True, hide_index=True)
+            else:
+                st.info("ഇതുവരെ ട്രേഡുകൾ ഒന്നും നടന്നിട്ടില്ല.")
+        except Exception:
+            st.info("ട്രേഡുകൾ ഒന്നും നടന്നിട്ടില്ല.")
+
+    if state['running']:
+        if st.button("🔄 പേജ് റിഫ്രഷ് ചെയ്യുക"):
+            st.rerun()
 
 # ##################################################################
 # 🎯 വിഭാഗം 2: ലക്ഷ്യാധിഷ്ഠിത പോർട്ട്ഫോളിയോ
@@ -387,19 +478,19 @@ elif main_menu == "🎯 ലക്ഷ്യാധിഷ്ഠിത പോർട�
         else: eq_pct, gold_pct, cash_pct, reit_pct = 0.15, 0.25, 0.50, 0.10
         rec_text = "1 വർഷത്തെ ഹ്രസ്വകാലത്തേക്ക് ഇക്വിറ്റി റിസ്ക് കുറയ്ക്കണം. ലിക്വിഡ് കാഷിലും സ്വർണ്ണത്തിലും മുൻഗണന."
     elif "3 - 5 വർഷം" in goal_horizon:
-        if "യുദ്ധ" in market_climate: eq_pct, gold_pct, cash_pct, reit_pct = 0.40, 0.25, 0.25, (0.0 if is_shariah else 0.10)
-        else: eq_pct, gold_pct, cash_pct, reit_pct = 0.60, 0.15, 0.15, (0.0 if is_shariah else 0.10)
+        if "യുദ്ധ" in market_climate: eq_pct, gold_pct, cash_pct, reit_pct = 0.40, 0.30 if is_shariah else 0.25, 0.30 if is_shariah else 0.25, (0.0 if is_shariah else 0.10)
+        else: eq_pct, gold_pct, cash_pct, reit_pct = 0.60, 0.20 if is_shariah else 0.15, 0.20 if is_shariah else 0.15, (0.0 if is_shariah else 0.10)
         rec_text = "ഇടത്തരം കാലാവധിയിൽ ഹൈ-ഗ്രോത്ത് കമ്പനികൾക്കും എത്തിക്കൽ ഫണ്ടുകൾക്കും മുൻഗണന."
     else:
         if "തകർച്ച" in market_climate: eq_pct, gold_pct, cash_pct, reit_pct = 0.75, 0.15, 0.10, 0.0
-        else: eq_pct, gold_pct, cash_pct, reit_pct = 0.65, 0.15, 0.10, (0.0 if is_shariah else 0.10)
+        else: eq_pct, gold_pct, cash_pct, reit_pct = 0.70 if is_shariah else 0.65, 0.20 if is_shariah else 0.15, 0.10, (0.0 if is_shariah else 0.10)
         rec_text = "ദീർഘകാലത്തേക്ക് അൺബ്രേക്കബിൾ കുത്തകകളിൽ പണം കോമ്പൗണ്ട് ചെയ്യാൻ അനുവദിക്കുക."
 
     st.info(f"💡 **വിദഗ്ദ്ധന്റെ നിർദ്ദേശം:** {rec_text}")
     a1, a2, a3, a4 = st.columns(4)
     a1.metric("ഇക്വിറ്റി ഓഹരികൾ", f"₹{(inv_amount * eq_pct):,.0f}", f"{int(eq_pct*100)}%")
     a2.metric("ഗോൾഡ് & സിൽവർ", f"₹{(inv_amount * gold_pct):,.0f}", f"{int(gold_pct*100)}%")
-    a3.metric("ക്യാഷ് / സേവിങ്സ്", f"₹{(inv_amount * cash_pct):,.0f}", f"{int(cash_pct*100)}%")
+    a3.metric("ക്യാഷ് / കറന്റ് അക്കൗണ്ട്", f"₹{(inv_amount * cash_pct):,.0f}", f"{int(cash_pct*100)}%")
     if not is_shariah: a4.metric("റിയൽ എസ്റ്റേറ്റ് REITs", f"₹{(inv_amount * reit_pct):,.0f}", f"{int(reit_pct*100)}%")
     else: a4.metric("ശരീഅത്ത് പാലിക്കൽ", "100% Halal", "AAOIFI")
 
@@ -465,14 +556,14 @@ elif main_menu == "💼 എന്റെ ലൈവ് പോർട്ട്ഫോ
     with h_tab2:
         st.subheader("📝 മറ്റ് ആപ്പുകളിൽ വാങ്ങിയ ഓഹരികൾ രേഖപ്പെടുത്തുക")
         col_m1, col_m2, col_m3 = st.columns(3)
-        m_sym = col_m1.text_input("സ്റ്റോക്ക് സിംബൽ (ഉദാ: CDSL, TCS):").upper()
-        m_qty = col_m2.number_input("വാങ്ങിയ എണ്ണം (Qty):", value=1, step=1)
-        m_bp = col_m3.number_input("വാങ്ങിയ വില (₹):", value=100.0, step=10.0)
+        m_sym = col_m1.text_input("സ്റ്റോക്ക് സിംബൽ (ഉദാ: CDSL, TCS):").upper().strip()
+        m_qty = col_m2.number_input("വാങ്ങിയ എണ്ണം (Qty):", value=1, min_value=1, step=1)
+        m_bp = col_m3.number_input("വാങ്ങിയ വില (₹):", value=100.0, min_value=1.0, step=10.0)
 
         if st.button("➕ എന്റെ പോർട്ട്ഫോളിയോയിലേക്ക് ചേർക്കുക"):
             if m_sym:
                 try:
-                    conn = sqlite3.connect(DB_NAME)
+                    conn = get_db_connection()
                     c = conn.cursor()
                     c.execute("INSERT INTO manual_portfolio (symbol, qty, buy_price, buy_date, notes) VALUES (?, ?, ?, ?, ?)",
                               (m_sym, m_qty, m_bp, datetime.date.today().strftime("%Y-%m-%d"), "Manual Entry"))
@@ -484,12 +575,15 @@ elif main_menu == "💼 എന്റെ ലൈവ് പോർട്ട്ഫോ
 
         st.markdown("---")
         try:
-            conn = sqlite3.connect(DB_NAME)
-            df_man = pd.read_sql_query("SELECT symbol AS Stock, qty AS Qty, buy_price AS [Buy Price], buy_date AS [Bought Date] FROM manual_portfolio ORDER BY id DESC", conn)
+            conn = get_db_connection()
+            df_man = pd.read_sql_query("SELECT id AS ID, symbol AS Stock, qty AS Qty, buy_price AS [Buy Price], buy_date AS [Bought Date] FROM manual_portfolio ORDER BY id DESC", conn)
             conn.close()
-            if not df_man.empty: st.dataframe(df_man, use_container_width=True, hide_index=True)
-            else: st.info("ഇതുവരെ മാനുവൽ ഓഹരികൾ ചേർത്തിട്ടില്ല.")
-        except Exception: st.info("ഡാറ്റ ലഭ്യമായിട്ടില്ല.")
+            if not df_man.empty:
+                st.dataframe(df_man, use_container_width=True, hide_index=True)
+            else:
+                st.info("ഇതുവരെ മാനുവൽ ഓഹരികൾ ചേർത്തിട്ടില്ല.")
+        except Exception:
+            st.info("ഡാറ്റ ലഭ്യമായിട്ടില്ല.")
 
 # ##################################################################
 # 🏛️ വിഭാഗം 4: 50-Year Veteran സ്റ്റോക്ക് നിലവറ
@@ -530,7 +624,7 @@ elif main_menu == "📈 മ്യൂച്വൽ ഫണ്ടുകൾ & ഇ.ട
         funds = [
             {"Fund": "Tata Ethical Fund", "Type": "Shariah Equity", "3Y CAGR": "20.8%", "5Y CAGR": "22.5%", "Expense": "0.85%"},
             {"Fund": "Taurus Ethical Fund", "Type": "Shariah Equity", "3Y CAGR": "22.1%", "5Y CAGR": "21.2%", "Expense": "0.95%"},
-            {"Fund": "Nippon Gold BeES", "Type": "Physical Gold", "Purity": "99.5% 24K", "Expense": "0.55%"}
+            {"Fund": "Nippon Gold BeES", "Type": "Physical Gold", "3Y CAGR": "16.4%", "5Y CAGR": "14.8%", "Expense": "0.55%"}
         ]
     else:
         funds = [
@@ -578,15 +672,35 @@ elif main_menu == "🥇 ഗോൾഡ് & സുരക്ഷിത ആസ്ത�
 # ##################################################################
 elif main_menu == "📚 അഡ്വൈസറി ജേർണൽ & ചേഞ്ച് ലോഗ്":
     st.title("📚 ഇൻവെസ്റ്റ്മെന്റ് ജേർണൽ & ചേഞ്ച് ലോഗ്")
+    st.caption("നിങ്ങളുടെ പ്രധാന നിക്ഷേപ തീരുമാനങ്ങളും അതിന്റെ കാരണങ്ങളും ഇവിടെ രേഖപ്പെടുത്തി വെക്കാം.")
+
+    with st.expander("➕ പുതിയ നിക്ഷേപ തീരുമാനം രേഖപ്പെടുത്തുക"):
+        j_col1, j_col2, j_col3 = st.columns(3)
+        j_asset = j_col1.text_input("അസറ്റ് / സ്റ്റോക്ക് (ഉദാ: TCS, Gold):").upper().strip()
+        j_action = j_col2.selectbox("തീരുമാനം:", ["BUY (വാങ്ങി)", "HOLD (തുടരുന്നു)", "SELL (വിറ്റു)", "WATCHLIST (നിരീക്ഷണത്തിൽ)"])
+        j_status = j_col3.selectbox("സ്വഭാവം:", ["✅ Long-Term Moat", "🌙 Halal Verified", "⚠️ Tactical Bet", "🛑 Rule Exit"])
+        j_reason = st.text_area("എന്തുകൊണ്ട് ഈ തീരുമാനം എടുത്തു? (Veteran Thesis):")
+
+        if st.button("💾 ജേർണലിൽ സേവ് ചെയ്യുക"):
+            if j_asset and j_reason:
+                try:
+                    conn = get_db_connection()
+                    c = conn.cursor()
+                    c.execute("INSERT INTO wealth_audit (date, asset, category, action, status, veteran_reason) VALUES (?, ?, ?, ?, ?, ?)",
+                              (datetime.date.today().strftime("%Y-%m-%d"), j_asset, "Equity/Asset", j_action, j_status, j_reason))
+                    conn.commit()
+                    conn.close()
+                    st.success("✅ തീരുമാനം ജേർണലിൽ രേഖപ്പെടുത്തി!")
+                except Exception as e:
+                    st.error(f"സേവ് ചെയ്യുന്നതിൽ തടസ്സം: {e}")
+
     try:
-        conn = sqlite3.connect(DB_NAME)
+        conn = get_db_connection()
         df_audit = pd.read_sql_query("SELECT date AS Date, asset AS Asset, action AS Action, status AS Status, veteran_reason AS [Reason / Thesis] FROM wealth_audit ORDER BY id DESC LIMIT 50", conn)
         conn.close()
-        if not df_audit.empty: st.dataframe(df_audit, use_container_width=True, hide_index=True)
-        else: st.info("തീരുമാനങ്ങൾ ഇവിടെ ഓഡിറ്റ് ആയി രേഖപ്പെടുത്തും.")
-    except Exception: st.info("ഡാറ്റ വരാൻ കാത്തിരിക്കുന്നു...")
-
-# റൺ ചെയ്യുമ്പോൾ ഓട്ടോ റിഫ്രഷ്
-if main_menu == "⚡ ഇൻട്രാഡേ ട്രേഡിംഗ് ബോട്ട് (Active Algo Engine)" and state['running']:
-    time.sleep(5)
-    st.rerun()
+        if not df_audit.empty:
+            st.dataframe(df_audit, use_container_width=True, hide_index=True)
+        else:
+            st.info("തീരുമാനങ്ങൾ ഇവിടെ ഓഡിറ്റ് ആയി രേഖപ്പെടുത്തും.")
+    except Exception:
+        st.info("ഡാറ്റ വരാൻ കാത്തിരിക്കുന്നു...")
