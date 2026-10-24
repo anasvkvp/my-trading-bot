@@ -8,10 +8,10 @@ import threading
 import sqlite3
 import yfinance as yf
 
-st.set_page_config(page_title="Autonomous Wealth OS", layout="wide", page_icon="🏛️")
+st.set_page_config(page_title="Complete Global Wealth & Trading Hub", layout="wide", page_icon="🏦")
 
 # ==========================================
-# 🗄️ ഡാറ്റാബേസ് സെറ്റപ്പ്
+# 🗄️ ഡാറ്റാബേസ് സെറ്റപ്പ് (v2)
 # ==========================================
 DB_NAME = "trading_journal_v2.db"
 
@@ -32,6 +32,9 @@ def init_db():
                         id INTEGER PRIMARY KEY AUTOINCREMENT,
                         date TEXT, asset TEXT, category TEXT, action TEXT,
                         status TEXT, veteran_reason TEXT)''')
+        c.execute('''CREATE TABLE IF NOT EXISTS manual_portfolio (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        symbol TEXT, qty REAL, buy_price REAL, buy_date TEXT, notes TEXT)''')
         conn.commit()
         conn.close()
     except Exception:
@@ -39,20 +42,8 @@ def init_db():
 
 init_db()
 
-def log_wealth_decision(asset, category, action, status, reason):
-    try:
-        conn = sqlite3.connect(DB_NAME)
-        c = conn.cursor()
-        today = datetime.date.today().strftime("%Y-%m-%d")
-        c.execute('''INSERT INTO wealth_audit (date, asset, category, action, status, veteran_reason)
-                     VALUES (?, ?, ?, ?, ?, ?)''', (today, asset, category, action, status, reason))
-        conn.commit()
-        conn.close()
-    except Exception:
-        pass
-
 # ==========================================
-# 👑 മാസ്റ്റർ ഗ്ലോബൽ സ്വിച്ച് (Master Shariah vs General)
+# 👑 മാസ്റ്റർ ഗ്ലോബൽ സ്വിച്ച്
 # ==========================================
 st.sidebar.markdown("# 🏛️ WEALTH OS")
 wealth_mode = st.sidebar.radio(
@@ -65,22 +56,42 @@ st.sidebar.markdown("---")
 main_menu = st.sidebar.radio(
     "പ്രധാന വിഭാഗം തിരഞ്ഞെടുക്കുക:",
     [
-        "🎯 ലക്ഷ്യാധിഷ്ഠിത പോർട്ട്ഫോളിയോ (Goal & Allocation Engine)",
+        "🎯 ലക്ഷ്യാധിഷ്ഠിത പോർട്ട്ഫോളിയോ (Goal Engine)",
+        "💼 എന്റെ ലൈവ് പോർട്ട്ഫോളിയോ & എക്സിറ്റ് വാച്ച്ഡോഗ്",
         "🏛️ 50-Year Veteran സ്റ്റോക്ക് നിലവറ (Why Buy & Exit Rules)",
         "📈 മ്യൂച്വൽ ഫണ്ടുകൾ & ഇ.ടി.എഫുകൾ",
         "🌍 ആഗോള വിപണികൾ (US & Currency Advisor)",
         "🥇 ഗോൾഡ് & സുരക്ഷിത ആസ്തികൾ",
-        "📚 അഡ്വൈസറി ജേർണൽ & ചേഞ്ച് ലോഗ് (Audit History)",
+        "📚 അഡ്വൈസറി ജേർണൽ & ചേഞ്ച് ലോഗ്",
         "⚡ ഇൻട്രാഡേ ട്രേഡിംഗ് ബോട്ട്"
     ]
 )
 
+WATCHLIST = {
+    'SBIN': 'NSE_EQ|INE062A01020',
+    'RELIANCE': 'NSE_EQ|INE002A01018',
+    'BHARTIARTL': 'NSE_EQ|INE397D01024',
+    'LT': 'NSE_EQ|INE018A01030'
+}
+NIFTY_KEY = 'NSE_INDEX|Nifty 50'
+
+@st.cache_resource
+def get_global_state():
+    return {
+        'running': False, 'token': '', 'capital': 5000.0, 'risk': 100.0,
+        'mode': 'പേപ്പർ ട്രേഡിംഗ്', 'tg_token': '', 'tg_chat': '',
+        'thread': None, 'consecutive_losses': 0, 'kill_switch': False,
+        'nifty_status': 'പരിശോധിക്കുന്നു...', 'active_pos': None
+    }
+
+state = get_global_state()
+
 # ##################################################################
-# 🎯 വിഭാഗം 1: ലക്ഷ്യാധിഷ്ഠിത പോർട്ട്ഫോളിയോ എഞ്ചിൻ (Goal & Time Horizon)
+# 🎯 വിഭാഗം 1: ലക്ഷ്യാധിഷ്ഠിത പോർട്ട്ഫോളിയോ എഞ്ചിൻ
 # ##################################################################
-if main_menu == "🎯 ലക്ഷ്യാധിഷ്ഠിത പോർട്ട്ഫോളിയോ (Goal & Allocation Engine)":
-    st.title("🎯 ലക്ഷ്യാധിഷ്ഠിത വെൽത്ത് കാൽക്കുലേറ്റർ (Goal-Based Asset Allocation)")
-    st.caption("50-വർഷത്തെ വിദഗ്ദ്ധ തത്വം: കാലാവധിയും വിപണി സാഹചര്യവും അനുസരിച്ച് പണം വിന്യസിക്കുക.")
+if main_menu == "🎯 ലക്ഷ്യാധിഷ്ഠിത പോർട്ട്ഫോളിയോ (Goal Engine)":
+    st.title("🎯 ലക്ഷ്യാധിഷ്ഠിത വെൽത്ത് കാൽക്കുലേറ്റർ")
+    st.caption("കാലാവധിയും വിപണി സാഹചര്യവും അനുസരിച്ച് പണം വിന്യസിക്കുക.")
 
     if is_shariah:
         st.success("🌙 **100% ശരീഅത്ത് മോഡ് സജീവം:** പലിശ ബാങ്കുകളോ, നോൺ-ഹലാൽ കടപത്രങ്ങളോ ഇല്ലാതെ പൂർണ്ണമായും ശുദ്ധമായ ഹലാൽ അസറ്റുകൾ മാത്രം ഉൾപ്പെടുത്തിയിരിക്കുന്നു.")
@@ -99,10 +110,8 @@ if main_menu == "🎯 ലക്ഷ്യാധിഷ്ഠിത പോർട്
 
     st.markdown("---")
     st.subheader("🛡️ മാക്രോ മാർക്കറ്റ് & യുദ്ധ സാഹചര്യം (Market Climate Sentinel)")
-    
-    # മാർക്കറ്റ് സാഹചര്യം തിരഞ്ഞെടുക്കൽ
     market_climate = st.selectbox(
-        "നിലവിലെ വിപണി സാഹചര്യം വിലയിരുത്തുക (Current Market Regime):",
+        "നിലവിലെ വിപണി സാഹചര്യം വിലയിരുത്തുക:",
         [
             "🟢 ശാന്തമായ വിപണി (Normal Bull / Steady Growth)",
             "⚠️ അസ്ഥിരതയും യുദ്ധ ഭീഷണിയും / എണ്ണവില വർദ്ധനവ് (War / High Oil / Volatility)",
@@ -110,229 +119,224 @@ if main_menu == "🎯 ലക്ഷ്യാധിഷ്ഠിത പോർട്
         ]
     )
 
-    # അലോക്കേഷൻ കണക്കുകൂട്ടൽ
     if "1 വർഷം" in goal_horizon:
-        if is_shariah:
-            eq_pct, gold_pct, cash_pct, reit_pct = 0.15, 0.35, 0.50, 0.0
-            rec_text = "1 വർഷത്തെ ഹ്രസ്വകാലത്തേക്ക് ഇക്വിറ്റി റിസ്ക് വളരെ കുറയ്ക്കണം. പലിശ രഹിത ഇസ്‌ലാമിക സേവിങ്സ്/ക്യാഷിലും ഗോൾഡിലും മുൻഗണന."
-        else:
-            eq_pct, gold_pct, cash_pct, reit_pct = 0.15, 0.25, 0.50, 0.10
-            rec_text = "1 വർഷത്തേക്ക് മുതൽ സുരക്ഷിതമായിരിക്കണം. ആർബിട്രേജ് ഫണ്ടുകളിലും ലിക്വിഡ് കാഷിലും മുൻഗണന."
+        if is_shariah: eq_pct, gold_pct, cash_pct, reit_pct = 0.15, 0.35, 0.50, 0.0
+        else: eq_pct, gold_pct, cash_pct, reit_pct = 0.15, 0.25, 0.50, 0.10
+        rec_text = "1 വർഷത്തെ ഹ്രസ്വകാലത്തേക്ക് ഇക്വിറ്റി റിസ്ക് കുറയ്ക്കണം. ലിക്വിഡ് കാഷിലും സ്വർണ്ണത്തിലും മുൻഗണന."
     elif "3 - 5 വർഷം" in goal_horizon:
-        if "യുദ്ധ" in market_climate:
-            eq_pct, gold_pct, cash_pct, reit_pct = 0.40, 0.25, 0.25, (0.0 if is_shariah else 0.10)
-            rec_text = "യുദ്ധവും ക്രൂഡ് ഓയിൽ ഭീഷണിയും ഉള്ളതിനാൽ സ്വർണ്ണത്തിന്റെയും ലിക്വിഡ് ക്യാഷിന്റെയും വിഹിതം വർദ്ധിപ്പിച്ചു."
-        else:
-            eq_pct, gold_pct, cash_pct, reit_pct = 0.60, 0.15, 0.15, (0.0 if is_shariah else 0.10)
-            rec_text = "ഇടത്തരം കാലാവധിയിൽ ഹൈ-ഗ്രോത്ത് കമ്പനികൾക്കും എത്തിക്കൽ ഫണ്ടുകൾക്കും മുൻഗണന."
-    else:  # 10+ വർഷം
-        if "തകർച്ച" in market_climate:
-            eq_pct, gold_pct, cash_pct, reit_pct = 0.75, 0.15, 0.10, 0.0
-            rec_text = "മാർക്കറ്റ് കടുത്ത തകർച്ചയിലാണ്! വാറൻ ബഫറ്റ് ശൈലിയിൽ കയ്യിലുള്ള പണം ഉപയോഗിച്ച് കുത്തക ഓഹരികൾ വാങ്ങിക്കൂട്ടാൻ ഏറ്റവും അനുയോജ്യമായ സമയം!"
-        else:
-            eq_pct, gold_pct, cash_pct, reit_pct = 0.65, 0.15, 0.10, (0.0 if is_shariah else 0.10)
-            rec_text = "10 വർഷത്തിലധികം കാലാവധിയുള്ളതിനാൽ അൺബ്രേക്കബിൾ കുത്തകകളിലും ഫ്ലെക്സി ക്യാപിലും പണം കോമ്പൗണ്ട് ചെയ്യാൻ അനുവദിക്കുക."
+        if "യുദ്ധ" in market_climate: eq_pct, gold_pct, cash_pct, reit_pct = 0.40, 0.25, 0.25, (0.0 if is_shariah else 0.10)
+        else: eq_pct, gold_pct, cash_pct, reit_pct = 0.60, 0.15, 0.15, (0.0 if is_shariah else 0.10)
+        rec_text = "ഇടത്തരം കാലാവധിയിൽ ഹൈ-ഗ്രോത്ത് കമ്പനികൾക്കും എത്തിക്കൽ ഫണ്ടുകൾക്കും മുൻഗണന."
+    else:
+        if "തകർച്ച" in market_climate: eq_pct, gold_pct, cash_pct, reit_pct = 0.75, 0.15, 0.10, 0.0
+        else: eq_pct, gold_pct, cash_pct, reit_pct = 0.65, 0.15, 0.10, (0.0 if is_shariah else 0.10)
+        rec_text = "ദീർഘകാലത്തേക്ക് അൺബ്രേക്കബിൾ കുത്തകകളിൽ പണം കോമ്പൗണ്ട് ചെയ്യാൻ അനുവദിക്കുക."
 
     st.info(f"💡 **വിദഗ്ദ്ധന്റെ നിർദ്ദേശം:** {rec_text}")
-
-    # വിഷ്വൽ കാർഡുകൾ
     a1, a2, a3, a4 = st.columns(4)
     a1.metric("ഇക്വിറ്റി ഓഹരികൾ", f"₹{(inv_amount * eq_pct):,.0f}", f"{int(eq_pct*100)}%")
     a2.metric("ഗോൾഡ് & സിൽവർ", f"₹{(inv_amount * gold_pct):,.0f}", f"{int(gold_pct*100)}%")
-    a3.metric("ക്യാഷ് / ലിക്വിഡ് ഫണ്ട്", f"₹{(inv_amount * cash_pct):,.0f}", f"{int(cash_pct*100)}%")
-    if not is_shariah:
-        a4.metric("റിയൽ എസ്റ്റേറ്റ് REITs", f"₹{(inv_amount * reit_pct):,.0f}", f"{int(reit_pct*100)}%")
-    else:
-        a4.metric("ശരീഅത്ത് പാലിക്കൽ", "100% Halal", "AAOIFI")
+    a3.metric("ക്യാഷ് / സേവിങ്സ്", f"₹{(inv_amount * cash_pct):,.0f}", f"{int(cash_pct*100)}%")
+    if not is_shariah: a4.metric("റിയൽ എസ്റ്റേറ്റ് REITs", f"₹{(inv_amount * reit_pct):,.0f}", f"{int(reit_pct*100)}%")
+    else: a4.metric("ശരീഅത്ത് പാലിക്കൽ", "100% Halal", "AAOIFI")
 
 # ##################################################################
-# 🏛️ വിഭാഗം 2: 50-Year Veteran സ്റ്റോക്ക് നിലവറ (Why Buy & Exit Rules)
+# 💼 വിഭാഗം 2: എന്റെ ലൈവ് പോർട്ട്ഫോളിയോ & എക്സിറ്റ് വാച്ച്ഡോഗ് (NEW!)
+# ##################################################################
+elif main_menu == "💼 എന്റെ ലൈവ് പോർട്ട്ഫോളിയോ & എക്സിറ്റ് വാച്ച്ഡോഗ്":
+    st.title("💼 എന്റെ പോർട്ട്ഫോളിയോ & എക്സിറ്റ് വാച്ച്ഡോഗ് (Live Holdings Sentinel)")
+    st.caption("നിങ്ങൾ വാങ്ങിയ ഓഹരികൾ ബ്രോക്കറിൽ നിന്ന് തനിയെ കണ്ടെത്തി, എക്സിറ്റ് സിഗ്നലുകൾ തത്സമയം നിരീക്ഷിക്കുന്ന സംവിധാനം.")
+
+    h_tab1, h_tab2 = st.tabs(["⚡ Upstox ലൈവ് ഹോൾഡിംഗ്സ് (Auto Sync)", "📝 മാനുവൽ പോർട്ട്ഫോളിയോ (Groww / Zerodha)"])
+
+    with h_tab1:
+        st.subheader("⚡ Upstox-ൽ നിലവിലുള്ള ഓഹരികൾ (Demat Holdings)")
+        user_token = st.sidebar.text_input("പോർട്ട്ഫോളിയോ കാണാൻ Upstox Token:", value=state['token'], type="password", key="holdings_token")
+
+        if st.button("🔄 Upstox-ൽ നിന്ന് പോർട്ട്ഫോളിയോ എടുക്കുക"):
+            if not user_token:
+                st.error("സൈഡ്‌ബാറിൽ Upstox Access Token നൽകുക!")
+            else:
+                with st.spinner("⏳ Upstox ഡിമാറ്റിൽ നിന്ന് ഓഹരികൾ സിങ്ക് ചെയ്യുന്നു..."):
+                    headers = {'Accept': 'application/json', 'Authorization': f'Bearer {user_token}'}
+                    try:
+                        res = requests.get('https://api.upstox.com/v2/portfolio/long-term-holdings', headers=headers, timeout=10)
+                        data = res.json()
+                        if data.get('status') == 'success' and 'data' in data:
+                            holdings = data['data']
+                            if len(holdings) > 0:
+                                parsed_h = []
+                                total_val = 0.0
+                                total_pnl = 0.0
+                                for h in holdings:
+                                    sym = h.get('trading_symbol', 'N/A')
+                                    qty = h.get('quantity', 0)
+                                    avg_p = h.get('average_price', 0.0)
+                                    cur_p = h.get('last_price', 0.0)
+                                    pnl = h.get('pnl', 0.0)
+                                    total_val += (cur_p * qty)
+                                    total_pnl += pnl
+
+                                    # എക്സിറ്റ് ഹെൽത്ത് ചെക്ക്
+                                    pnl_pct = ((cur_p - avg_p) / avg_p * 100) if avg_p > 0 else 0
+                                    if pnl_pct < -10.0:
+                                        sentinel_status = "🚨 എക്സിറ്റ് മുന്നറിയിപ്പ് (Stop-Loss / Review)"
+                                    elif pnl_pct > 20.0:
+                                        sentinel_status = "🟢 മികച്ച ലാഭത്തിൽ (Hold / Trail SL)"
+                                    else:
+                                        sentinel_status = "🟡 സാധാരണ നിലയിൽ (Hold)"
+
+                                    parsed_h.append({
+                                        'Stock': sym, 'Quantity': qty, 'Avg Buy Price': round(avg_p, 2),
+                                        'Current Price': round(cur_p, 2), 'Total P&L (₹)': round(pnl, 2),
+                                        'P&L (%)': f"{round(pnl_pct, 1)}%", 'Watchdog Status': sentinel_status
+                                    })
+
+                                hc1, hc2 = st.columns(2)
+                                hc1.metric("ആകെ പോർട്ട്ഫോളിയോ മൂല്യം", f"₹{total_val:,.2f}")
+                                hc2.metric("ആകെ ലാഭം / നഷ്ടം", f"₹{total_pnl:,.2f}", delta=f"₹{total_pnl:,.2f}")
+                                st.dataframe(pd.DataFrame(parsed_h), use_container_width=True, hide_index=True)
+                            else:
+                                st.info("നിങ്ങളുടെ Upstox അക്കൗണ്ടിൽ നിലവിൽ ഹോൾഡിംഗ്സുകൾ ഒന്നും കണ്ടെത്തിയില്ല.")
+                        else:
+                            st.warning(f"Upstox കണക്റ്റിവിറ്റിയിൽ തടസ്സം: {data.get('errors', 'ടോക്കൺ കാലാവധി കഴിഞ്ഞിരിക്കാം.')}")
+                    except Exception as e:
+                        st.error(f"ഡാറ്റ ലഭിക്കുന്നതിൽ തടസ്സം: {e}")
+
+    with h_tab2:
+        st.subheader("📝 മറ്റ് ആപ്പുകളിൽ വാങ്ങിയ ഓഹരികൾ രേഖപ്പെടുത്തുക (Groww, Zerodha, etc.)")
+        col_m1, col_m2, col_m3 = st.columns(3)
+        m_sym = col_m1.text_input("സ്റ്റോക്ക് സിംബൽ (ഉദാ: CDSL, TCS):").upper()
+        m_qty = col_m2.number_input("വാങ്ങിയ എണ്ണം (Qty):", value=1, step=1)
+        m_bp = col_m3.number_input("വാങ്ങിയ വില (₹):", value=100.0, step=10.0)
+
+        if st.button("➕ എന്റെ പോർട്ട്ഫോളിയോയിലേക്ക് ചേർക്കുക"):
+            if m_sym:
+                try:
+                    conn = sqlite3.connect(DB_NAME)
+                    c = conn.cursor()
+                    c.execute("INSERT INTO manual_portfolio (symbol, qty, buy_price, buy_date, notes) VALUES (?, ?, ?, ?, ?)",
+                              (m_sym, m_qty, m_bp, datetime.date.today().strftime("%Y-%m-%d"), "Manual Entry"))
+                    conn.commit()
+                    conn.close()
+                    st.success(f"✅ {m_sym} പോർട്ട്ഫോളിയോയിൽ ചേർത്തു!")
+                except Exception as e:
+                    st.error(f"സേവ് ചെയ്യുന്നതിൽ തടസ്സം: {e}")
+
+        st.markdown("---")
+        st.caption("നിങ്ങൾ മാനുവലായി ചേർത്ത ഓഹരികൾ:")
+        try:
+            conn = sqlite3.connect(DB_NAME)
+            df_man = pd.read_sql_query("SELECT symbol AS Stock, qty AS Qty, buy_price AS [Buy Price], buy_date AS [Bought Date] FROM manual_portfolio ORDER BY id DESC", conn)
+            conn.close()
+            if not df_man.empty:
+                st.dataframe(df_man, use_container_width=True, hide_index=True)
+            else:
+                st.info("ഇതുവരെ മാനുവൽ ഓഹരികൾ ഒന്നും ചേർത്തിട്ടില്ല.")
+        except Exception:
+            st.info("ഡാറ്റ ലഭ്യമായിട്ടില്ല.")
+
+# ##################################################################
+# 🏛️ വിഭാഗം 3: 50-Year Veteran സ്റ്റോക്ക് നിലവറ
 # ##################################################################
 elif main_menu == "🏛️ 50-Year Veteran സ്റ്റോക്ക് നിലവറ (Why Buy & Exit Rules)":
     st.title("🏛️ 50-Year Veteran ഓഹരി നിലവറ")
-    st.caption("ഓരോ ഓഹരിയും എന്തുകൊണ്ട് വാങ്ങി? എപ്പോൾ വിറ്റ് ഒഴിവാക്കണം എന്നതിന്റെ കർശനമായ നിയമങ്ങൾ.")
+    st.caption("ഓരോ ഓഹരിയും എന്തുകൊണ്ട് വാങ്ങി? എപ്പോൾ വിറ്റ് ഒഴിവാക്കണം എന്നതിന്റെ കർശനമായ എക്സിറ്റ് നിയമങ്ങൾ.")
 
     if is_shariah:
-        st.success("🌙 **ശരീഅത്ത് പരിശോധന കഴിഞ്ഞ ഓഹരികൾ മാത്രം:** പലിശ രഹിത, കടബാധ്യത 33%-ൽ താഴെയുള്ള മുൻനിര കമ്പനികൾ.")
+        st.success("🌙 **ശരീഅത്ത് ഓഹരികൾ:** പലിശ രഹിത, കടബാധ്യത 33%-ൽ താഴെയുള്ള കമ്പനികൾ.")
         stocks_data = [
-            {
-                "Stock": "TCS (Tata Consultancy Services)",
-                "Sector": "IT / Tech Services",
-                "Why Buy? (50Y Thesis)": "ഇന്ത്യയിലെ ഏറ്റവും വലിയ കടരഹിത ഐടി ഭീമൻ. 58% ROCE. ഭീമമായ ക്യാഷ് ഫ്ലോ.",
-                "Red Flags (ഭീഷണികൾ)": "AI ഓട്ടോമേഷൻ കാരണം ക്ലയന്റുകൾ പുതിയ പ്രൊജക്റ്റുകൾ കുറയ്ക്കുന്നത്.",
-                "Sell / Exit Trigger (എപ്പോൾ വിൽക്കണം?)": "കമ്പനിയുടെ പ്രവർത്തന ലാഭം (Operating Margin) തുടർച്ചയായി 20%-ൽ താഴെ പോവുകയോ, മാനേജ്‌മെന്റ് സത്യസന്ധത നഷ്ടപ്പെടുകയോ ചെയ്താൽ.",
-                "Shariah Status": "✅ 100% AAOIFI Compliant"
-            },
-            {
-                "Stock": "Tata Elxsi",
-                "Sector": "AI Design & EV Software",
-                "Why Buy? (50Y Thesis)": "ഇലക്ട്രിക് വാഹന സോഫ്റ്റ്‌വെയറിലും ഹെൽത്ത്‌കെയർ AI-യിലും അത്യുഗ്രൻ കുത്തക. 42% ROCE.",
-                "Red Flags (ഭീഷണികൾ)": "ഉയർന്ന വാല്യുവേഷൻ (High P/E). യൂറോപ്യൻ വാഹന നിർമ്മാതാക്കളുടെ മാന്ദ്യം.",
-                "Sell / Exit Trigger (എപ്പോൾ വിൽക്കണം?)": "വിറ്റുവരവ് വളർച്ച (Sales Growth) തുടർച്ചയായി 10%-ൽ താഴെയാവുകയോ കടബാധ്യത വരികയോ ചെയ്താൽ.",
-                "Shariah Status": "✅ 100% AAOIFI Compliant"
-            },
-            {
-                "Stock": "Sun Pharma / Cipla",
-                "Sector": "Healthcare & Essential Pharma",
-                "Why Buy? (50Y Thesis)": "ജീവൻരക്ഷാ മരുന്നുകൾക്ക് മാന്ദ്യമോ യുദ്ധമോ ബാധകമല്ല. പൂജ്യം കടം. റെസഷൻ-പ്രൂഫ്.",
-                "Red Flags (ഭീഷണികൾ)": "യു.എസ് എഫ്.ഡി.എ (USFDA) റെഗുലേറ്ററി പരിശോധനകളിലെ തടസ്സങ്ങൾ.",
-                "Sell / Exit Trigger (എപ്പോൾ വിൽക്കണം?)": "ഗുരുതരമായ നിയമലംഘനങ്ങൾ കാരണം യു.എസ് പ്ലാന്റുകൾ സ്ഥിരമായി പൂട്ടാൻ ഉത്തരവ് വന്നാൽ.",
-                "Shariah Status": "✅ 100% AAOIFI Compliant"
-            },
-            {
-                "Stock": "Polycab India",
-                "Sector": "Cables & Infrastructure",
-                "Why Buy? (50Y Thesis)": "ഇന്ത്യയിലെ ഓരോ പുതിയ വീടിനും ഫാക്ടറിക്കും വയറുകൾ നൽകുന്ന 25% വിപണി കുത്തക. 28% ROCE.",
-                "Red Flags (ഭീഷണികൾ)": "കോപ്പർ (ചെമ്പ്) അസംസ്കൃത വസ്തുക്കളുടെ വിലക്കയറ്റം.",
-                "Sell / Exit Trigger (എപ്പോൾ വിൽക്കണം?)": "കമ്പനിയുടെ വിപണി വിഹിതം എതിരാളികൾ പിടിച്ചെടുക്കുകയോ അക്കൗണ്ടിംഗ് തട്ടിപ്പ് വരികയോ ചെയ്താൽ.",
-                "Shariah Status": "✅ 100% AAOIFI Compliant"
-            }
+            {"Stock": "TCS", "Sector": "IT Services", "Why Buy?": "കടരഹിത ഭീമൻ, 58% ROCE, ഉയർന്ന ക്യാഷ് ഫ്ലോ.", "Red Flags": "AI കാരണം ബില്ലിംഗ് ഇടിയുന്നത്.", "Exit Trigger": "ഓപ്പറേറ്റിംഗ് മാർജിൻ 20%-ൽ താഴെയായാൽ.", "Status": "✅ Halal"},
+            {"Stock": "Tata Elxsi", "Sector": "Design & EV", "Why Buy?": "ഇലക്ട്രിക് വാഹന സോഫ്റ്റ്‌വെയറിലെ കുത്തക. 42% ROCE.", "Red Flags": "യൂറോപ്യൻ വാഹന വിപണിയിലെ മാന്ദ്യം.", "Exit Trigger": "വിറ്റുവരവ് വളർച്ച 10%-ൽ താഴെയായാൽ.", "Status": "✅ Halal"},
+            {"Stock": "Sun Pharma", "Sector": "Pharma", "Why Buy?": "ജീവൻരക്ഷാ മരുന്നുകൾ, മാന്ദ്യത്തെ അതിജീവിക്കുന്ന ബിസിനസ്സ്.", "Red Flags": "USFDA റെഗുലേറ്ററി തടസ്സങ്ങൾ.", "Exit Trigger": "പ്രധാന പ്ലാന്റുകൾ സ്ഥിരമായി പൂട്ടിയാൽ.", "Status": "✅ Halal"},
+            {"Stock": "Polycab India", "Sector": "Cables & Infra", "Why Buy?": "വയർ വിപണിയിലെ 25% കുത്തക. 28% ROCE.", "Red Flags": "ചെമ്പ് വിലക്കയറ്റം.", "Exit Trigger": "വിപണി വിഹിതം നഷ്ടപ്പെടുകയോ തട്ടിപ്പ് വരികയോ ചെയ്താൽ.", "Status": "✅ Halal"}
         ]
     else:
         stocks_data = [
-            {
-                "Stock": "CDSL",
-                "Sector": "Capital Markets Depository",
-                "Why Buy? (50Y Thesis)": "ഡിമാറ്റ് അക്കൗണ്ടുകൾ കൂടുമ്പോൾ ടോൾ ബൂത്ത് പോലെ ലാഭം. 33% ROCE, പൂജ്യം കടം.",
-                "Red Flags (ഭീഷണികൾ)": "സെബി (SEBI) ഡിമാറ്റ് ട്രാൻസാക്ഷൻ ചാർജുകൾ വെട്ടിക്കുറയ്ക്കുന്നത്.",
-                "Sell / Exit Trigger (എപ്പോൾ വിൽക്കണം?)": "റെഗുലേറ്റർ കമ്മീഷൻ പരിധി പകുതിയായി വെട്ടിക്കുറയ്ക്കുകയോ പുതിയ എതിരാളികൾ വരികയോ ചെയ്താൽ.",
-                "Shariah Status": "⚠️ ഫിനാൻഷ്യൽ ഇൻകം ഉള്ളതിനാൽ ശരീഅത്തിൽ ഇല്ല"
-            },
-            {
-                "Stock": "Larsen & Toubro (L&T)",
-                "Sector": "Infrastructure & Hi-Tech",
-                "Why Buy? (50Y Thesis)": "ഇന്ത്യയുടെ വികസനത്തിൽ പാലങ്ങളും ചിപ്പ് ഫാക്ടറികളും നിർമ്മിക്കുന്ന ഏക ഭീമൻ. ₹5 ലക്ഷം കോടി ഓർഡർ ബുക്ക്.",
-                "Red Flags (ഭീഷണികൾ)": "സർക്കാർ അടിസ്ഥാന സൗകര്യ ചെലവുകൾ വെട്ടിക്കുറയ്ക്കുന്നത്.",
-                "Sell / Exit Trigger (എപ്പോൾ വിൽക്കണം?)": "ഓർഡർ ബുക്ക് താഴേക്ക് പോവുകയോ, കമ്പനിയുടെ കടം (Debt/Equity) 1.5-ന് മുകളിലേക്ക് കയറുകയോ ചെയ്താൽ.",
-                "Shariah Status": "⚠️ കൺവെൻഷണൽ"
-            },
-            {
-                "Stock": "ITC Limited",
-                "Sector": "Consumer Monopoly",
-                "Why Buy? (50Y Thesis)": "ഭീമമായ ഫ്രീ ക്യാഷ് ഫ്ലോ. 3.5%+ ഡിവിഡന്റ് യീൽഡ്. മാന്ദ്യത്തിലും തകരാത്ത ഡിമാൻഡ്.",
-                "Red Flags (ഭീഷണികൾ)": "പുകയില നികുതി ക്രമാതീതമായി വർദ്ധിപ്പിക്കുന്നത്.",
-                "Sell / Exit Trigger (എപ്പോൾ വിൽക്കണം?)": "സർക്കാർ സിഗരറ്റുകൾ പൂർണ്ണമായി നിരോധിക്കുകയോ, ക്യാഷ് ഫ്ലോ ഇടിയുകയോ ചെയ്താൽ.",
-                "Shariah Status": "❌ പുകയില ബിസിനസ്സ് ആയതിനാൽ ശരീഅത്തിൽ ഇല്ല"
-            },
-            {
-                "Stock": "HAL (Hindustan Aeronautics)",
-                "Sector": "Defence Monopoly",
-                "Why Buy? (50Y Thesis)": "വ്യോമസേനയ്ക്ക് ഫൈറ്റർ ജെറ്റുകൾ നിർമ്മിക്കുന്ന പരമാധികാര കുത്തക. കടമില്ല. 8 വർഷത്തെ ഓർഡർ ഉറപ്പ്.",
-                "Red Flags (ഭീഷണികൾ)": "പ്രതിരോധ വിഹിതം വെട്ടിക്കുറയ്ക്കൽ, എഞ്ചിൻ വിതരണ തടസ്സങ്ങൾ.",
-                "Sell / Exit Trigger (എപ്പോൾ വിൽക്കണം?)": "സർക്കാർ സ്വകാര്യ കമ്പനികൾക്ക് ജെറ്റ് നിർമ്മാണത്തിന് പൂർണ്ണാനുമതി നൽകുകയോ ഓർഡറുകൾ റദ്ദാക്കുകയോ ചെയ്താൽ.",
-                "Shariah Status": "⚠️ കൺവെൻഷണൽ"
-            }
+            {"Stock": "CDSL", "Sector": "Depository", "Why Buy?": "ഡിമാറ്റ് അക്കൗണ്ടുകൾ കൂടുമ്പോൾ ടോൾ ബൂത്ത് പോലെ ലാഭം. 33% ROCE.", "Red Flags": "SEBI ചാർജുകൾ വെട്ടിക്കുറയ്ക്കൽ.", "Exit Trigger": "റെഗുലേറ്ററി കമ്മീഷൻ പകുതിയായി കുറച്ചാൽ.", "Status": "⚠️ കൺവെൻഷണൽ"},
+            {"Stock": "L&T", "Sector": "Infrastructure", "Why Buy?": "ഇന്ത്യൻ വികസനത്തിലെ ഏക ഭീമൻ. ₹5 ലക്ഷം കോടി ഓർഡർ ബുക്ക്.", "Red Flags": "സർക്കാർ അടിസ്ഥാന ചെലവുകൾ വെട്ടിക്കുറയ്ക്കൽ.", "Exit Trigger": "കടം (Debt/Equity) 1.5 കടന്നാൽ.", "Status": "⚠️ കൺവെൻഷണൽ"},
+            {"Stock": "ITC Limited", "Sector": "FMCG / Cash Cow", "Why Buy?": "ഭീമമായ ക്യാഷ് ഫ്ലോ. 3.5%+ ഡിവിഡന്റ്. മാന്ദ്യത്തെ അതിജീവിക്കും.", "Red Flags": "പുകയില നികുതി വർദ്ധനവ്.", "Exit Trigger": "ക്യാഷ് ഫ്ലോ ഇടിയുകയോ സിഗരറ്റ് നിരോധിക്കുകയോ ചെയ്താൽ.", "Status": "❌ Non-Halal"},
+            {"Stock": "HAL", "Sector": "Defence", "Why Buy?": "വ്യോമസേനയ്ക്ക് ഫൈറ്റർ ജെറ്റുകൾ നിർമ്മിക്കുന്ന പരമാധികാര കുത്തക. കടമില്ല.", "Red Flags": "പ്രതിരോധ വിഹിതം വെട്ടിക്കുറയ്ക്കൽ.", "Exit Trigger": "സ്വകാര്യ കമ്പനികൾക്ക് നിർമ്മാണാനുമതി നൽകിയാൽ.", "Status": "⚠️ കൺവെൻഷണൽ"}
         ]
 
     for s in stocks_data:
         with st.expander(f"📌 {s['Stock']} — ({s['Sector']})"):
-            st.markdown(f"**🟢 എന്തുകൊണ്ട് വാങ്ങണം (Why Buy?):** {s['Why Buy? (50Y Thesis)']}")
-            st.markdown(f"**⚠️ ശ്രദ്ധിക്കേണ്ട റിസ്കുകൾ (Red Flags):** {s['Red Flags (ഭീഷണികൾ)']}")
-            st.error(f"🛑 **എപ്പോൾ വിറ്റ് ഒഴിവാക്കണം (Sell Trigger):** {s['Sell / Exit Trigger (എപ്പോൾ വിൽക്കണം?)']}")
-            st.caption(f"സ്റ്റാറ്റസ്: {s['Shariah Status']}")
+            st.markdown(f"**🟢 എന്തുകൊണ്ട് വാങ്ങണം:** {s['Why Buy?']}")
+            st.markdown(f"**⚠️ ശ്രദ്ധിക്കേണ്ട റിസ്കുകൾ:** {s['Red Flags']}")
+            st.error(f"🛑 **എപ്പോൾ വിറ്റ് ഒഴിവാക്കണം (Exit Trigger):** {s['Exit Trigger']}")
+            st.caption(f"സ്റ്റാറ്റസ്: {s['Status']}")
 
 # ##################################################################
-# 📈 വിഭാഗം 3: മ്യൂച്വൽ ഫണ്ടുകൾ & ഇ.ടി.എഫുകൾ
+# 📈 വിഭാഗം 4: മ്യൂച്വൽ ഫണ്ടുകൾ & ഇ.ടി.എഫുകൾ
 # ##################################################################
 elif main_menu == "📈 മ്യൂച്വൽ ഫണ്ടുകൾ & ഇ.ടി.എഫുകൾ":
-    st.title("📈 ശാസ്ത്രീയ മ്യൂച്വൽ ഫണ്ട് & ഇ.ടി.എഫ് സെലക്ടർ")
-    st.caption("ദീർഘകാല സമ്പത്തുണ്ടാക്കാൻ അനുയോജ്യമായ ഫണ്ടുകൾ.")
-
+    st.title("📈 മ്യൂച്വൽ ഫണ്ട് & ഇ.ടി.എഫ് സെലക്ടർ")
     if is_shariah:
-        st.subheader("🌙 ഇന്ത്യയിലെ ലൈസൻസുള്ള ശരീഅത്ത് ഫണ്ടുകൾ")
-        st.markdown("""
-        പലിശ ബാങ്കുകളിലോ മദ്യ/പുകയില കമ്പനികളിലോ നിക്ഷേപിക്കാത്ത, ഇസ്‌ലാമിക പണ്ഡിത സമിതിയുടെ മേൽനോട്ടത്തിലുള്ള ഫണ്ടുകൾ:
-        """)
         funds = [
-            {"Fund": "Tata Ethical Fund", "Type": "Shariah Equity", "3Y CAGR": "20.8%", "5Y CAGR": "22.5%", "Expense Ratio": "0.85%", "Why Invest?": "ഇന്ത്യയിലെ ഏറ്റവും പഴയതും വലുതുമായ ശരീഅത്ത് ഫണ്ട്."},
-            {"Fund": "Taurus Ethical Fund", "Type": "Shariah Equity", "3Y CAGR": "22.1%", "5Y CAGR": "21.2%", "Expense Ratio": "0.95%", "Why Invest?": "S&P BSE 500 Shariah ഇൻഡക്സ് പിന്തുടരുന്നു."},
-            {"Fund": "Nippon Gold BeES (GOLDBEES)", "Type": "100% Physical Gold", "Purity": "99.5% 24K", "Expense Ratio": "0.55%", "Why Invest?": "AAOIFI സ്റ്റാൻഡേർഡ് 57 പ്രകാരം അനുവദനീയമായ സ്വർണ്ണ ഇ.ടി.എഫ്."}
+            {"Fund": "Tata Ethical Fund", "Type": "Shariah Equity", "3Y CAGR": "20.8%", "5Y CAGR": "22.5%", "Expense": "0.85%"},
+            {"Fund": "Taurus Ethical Fund", "Type": "Shariah Equity", "3Y CAGR": "22.1%", "5Y CAGR": "21.2%", "Expense": "0.95%"},
+            {"Fund": "Nippon Gold BeES", "Type": "Physical Gold", "Purity": "99.5% 24K", "Expense": "0.55%"}
         ]
-        st.dataframe(pd.DataFrame(funds), use_container_width=True, hide_index=True)
     else:
         funds = [
-            {"Fund": "Parag Parikh Flexi Cap Fund", "Type": "Flexi Cap", "3Y CAGR": "21.5%", "5Y CAGR": "24.2%", "Expense Ratio": "0.62%", "Why Invest?": "ഇന്ത്യൻ ഓഹരികൾക്കൊപ്പം യു.എസ് ടെക് കുത്തകകളിലും നിക്ഷേപിക്കുന്നു."},
-            {"Fund": "UTI Nifty 50 Index Fund", "Type": "Large Cap Index", "3Y CAGR": "15.8%", "5Y CAGR": "16.5%", "Expense Ratio": "0.18%", "Why Invest?": "ഏറ്റവും കുറഞ്ഞ ചിലവ് (0.18%), സുരക്ഷിതമായ നിക്ഷേപം."},
-            {"Fund": "Quant Small Cap Fund", "Type": "Small Cap", "3Y CAGR": "34.2%", "5Y CAGR": "38.5%", "Expense Ratio": "0.77%", "Why Invest?": "അതിവേഗ വളർച്ചാ ഓഹരികളെ അൽഗോരിതം വഴി കണ്ടെത്തുന്നു."}
+            {"Fund": "Parag Parikh Flexi Cap Fund", "Type": "Flexi Cap", "3Y CAGR": "21.5%", "5Y CAGR": "24.2%", "Expense": "0.62%"},
+            {"Fund": "UTI Nifty 50 Index Fund", "Type": "Index", "3Y CAGR": "15.8%", "5Y CAGR": "16.5%", "Expense": "0.18%"},
+            {"Fund": "Quant Small Cap Fund", "Type": "Small Cap", "3Y CAGR": "34.2%", "5Y CAGR": "38.5%", "Expense": "0.77%"}
         ]
-        st.dataframe(pd.DataFrame(funds), use_container_width=True, hide_index=True)
+    st.dataframe(pd.DataFrame(funds), use_container_width=True, hide_index=True)
 
 # ##################################################################
-# 🌍 വിഭാഗം 4: ആഗോള വിപണികൾ (US & Currency Advisor)
+# 🌍 വിഭാഗം 5: ആഗോള വിപണികൾ (US & Currency Advisor)
 # ##################################################################
 elif main_menu == "🌍 ആഗോള വിപണികൾ (US & Currency Advisor)":
     st.title("🌍 ആഗോള നിക്ഷേപം & കറൻസി അഡ്വൈസർ")
-    st.caption("വാൾസ്ട്രീറ്റിലെ കുത്തകകളും ഇന്ത്യക്കാർക്കുള്ള ഏറ്റവും കുറഞ്ഞ ചിലവുള്ള നിക്ഷേപ വഴികളും.")
-
-    st.subheader("💡 ഒരു ഇന്ത്യക്കാരൻ എങ്ങനെ യു.എസിൽ നിക്ഷേപിക്കണം? (INR vs USD)")
-    st.markdown("""
-    **50-വർഷത്തെ വിദഗ്ദ്ധന്റെ സത്യസന്ധമായ വിലയിരുത്തൽ:**
-    * **നിങ്ങളുടെ നിക്ഷേപം ₹5 ലക്ഷത്തിൽ താഴെയാണെങ്കിൽ:**
-      * 👉 **ഇന്ത്യൻ രൂപയിൽ തന്നെ നിക്ഷേപിക്കുന്ന മ്യൂച്വൽ ഫണ്ടുകൾ / ഇ.ടി.എഫുകൾ (INR Route) തിരഞ്ഞെടുക്കുക!**
-      * *കാരണം:* ബാങ്ക് വഴി ഡോളർ അയക്കുമ്പോൾ വരുന്ന ഉയർന്ന വയർ ചാർജുകൾ ($20-$30), ഫോറെക്സ് നഷ്ടം, 20% TCS എന്നിവ പൂർണ്ണമായും ഒഴിവാക്കാം.
-    * **നിങ്ങളുടെ നിക്ഷേപം ₹10 ലക്ഷത്തിന് മുകളിലാണെങ്കിൽ:**
-      * 👉 INDmoney / Vested വഴി ഡോളറിലേക്ക് മാറ്റി ആപ്പിളും എൻവിഡിയയും നേരിട്ട് വാങ്ങി വെക്കാം.
-    """)
-
+    st.info("💡 **വിദഗ്ദ്ധന്റെ ഉപദേശം:** ₹5 ലക്ഷത്തിൽ താഴെയാണെങ്കിൽ ഇന്ത്യൻ മ്യൂച്വൽ ഫണ്ടുകൾ വഴി (INR റൂട്ട്) യു.എസിൽ നിക്ഷേപിക്കുക. ബാങ്ക് ട്രാൻസ്ഫർ ചാർജും TCS-ഉം ഒഴിവാക്കാം.")
     if is_shariah:
-        st.subheader("🌙 ആഗോള ഹലാൽ ഓഹരികൾ (Global Halal Leaders)")
         us_stocks = [
-            {"Company": "Nvidia (NVDA)", "Sector": "AI Computing", "Shariah": "✅ Compliant", "Moat": "AI ചിപ്പുകളിലെ ആഗോള കുത്തക. പലിശ രഹിത ബിസിനസ്സ്."},
-            {"Company": "Microsoft (MSFT)", "Sector": "Cloud & Software", "Shariah": "✅ Compliant", "Moat": "ലോകത്തെ എല്ലാ ഓഫീസുകളും പ്രവർത്തിക്കുന്ന സോഫ്റ്റ്‌വെയർ ശൃംഖല."},
-            {"Company": "Alphabet (Google)", "Sector": "Search & Cloud", "Shariah": "✅ Compliant", "Moat": "സൗജന്യ അറിവും യൂട്യൂബും വഴി പരസ്യ വരുമാനം നേടുന്ന കുത്തക."}
+            {"Company": "Nvidia (NVDA)", "Sector": "AI Hardware", "Shariah": "✅ Compliant", "Moat": "AI ചിപ്പുകളിലെ കുത്തക."},
+            {"Company": "Microsoft (MSFT)", "Sector": "Software", "Shariah": "✅ Compliant", "Moat": "എന്റർപ്രൈസ് ക്ലൗഡ് ശൃംഖല."},
+            {"Company": "Alphabet (Google)", "Sector": "Search & Cloud", "Shariah": "✅ Compliant", "Moat": "തിരച്ചിൽ & യൂട്യൂബ് കുത്തക."}
         ]
     else:
-        st.subheader("🇺🇸 വാൾസ്ട്രീറ്റിലെ വൻകിട കുത്തകകൾ (The Magnificent 7)")
         us_stocks = [
-            {"Company": "Microsoft (MSFT)", "Sector": "Software / AI", "Market Cap": "$3.1T+", "Moat": "എന്റർപ്രൈസ് ക്ലൗഡ് & ഓപ്പൺഎഐ പാർട്ണർഷിപ്പ്."},
-            {"Company": "Apple (AAPL)", "Sector": "Consumer Tech", "Market Cap": "$3.4T+", "Moat": "200 കോടി ഉപയോക്താക്കൾ അടങ്ങിയ ബ്രാൻഡ് കുത്തക."},
-            {"Company": "Nvidia (NVDA)", "Sector": "AI Hardware", "Market Cap": "$3.0T+", "Moat": "AI പ്രോസസ്സറുകളിലെ 85% വിപണി വിഹിതം."},
-            {"Company": "Berkshire Hathaway (BRK.B)", "Sector": "Holding / Insurance", "Market Cap": "$900B+", "Moat": "വാറൻ ബഫറ്റിന്റെ $300B പണശേഖരമുള്ള കോട്ട."}
+            {"Company": "Microsoft (MSFT)", "Sector": "Cloud / AI", "Market Cap": "$3.1T+"},
+            {"Company": "Apple (AAPL)", "Sector": "Consumer Tech", "Market Cap": "$3.4T+"},
+            {"Company": "Nvidia (NVDA)", "Sector": "AI Chips", "Market Cap": "$3.0T+"},
+            {"Company": "Berkshire Hathaway (BRK.B)", "Sector": "Insurance", "Market Cap": "$900B+"}
         ]
     st.dataframe(pd.DataFrame(us_stocks), use_container_width=True, hide_index=True)
 
 # ##################################################################
-# 🥇 വിഭാഗം 5: ഗോൾഡ് & സുരക്ഷിത ആസ്തികൾ
+# 🥇 വിഭാഗം 6: ഗോൾഡ് & സുരക്ഷിത ആസ്തികൾ
 # ##################################################################
 elif main_menu == "🥇 ഗോൾഡ് & സുരക്ഷിത ആസ്തികൾ":
-    st.title("🥇 ഗോൾഡ് & ക്രൈസിസ് പ്രൊട്ടക്ഷൻ (Crisis Shield)")
-    st.caption("ആഗോള യുദ്ധങ്ങളും മാർക്കറ്റ് തകർച്ചകളും വരുമ്പോൾ നിങ്ങളുടെ പണത്തെ സംരക്ഷിക്കുന്ന എയർബാഗ്.")
-
-    st.info("💡 **എന്തുകൊണ്ട് ഗോൾഡ് ഇ.ടി.എഫ്?** പണിക്കൂലിയോ ജിഎസ്ടിയോ ഇല്ലാതെ 99.5% ശുദ്ധമായ 24K സ്വർണ്ണത്തിൽ നിക്ഷേപിക്കാം. 12 മാസം കഴിഞ്ഞാൽ വെറും 12.5% മാത്രമാണ് ലോങ്ങ്-ടേം നികുതി!")
-
+    st.title("🥇 ഗോൾഡ് & ക്രൈസിസ് പ്രൊട്ടക്ഷൻ")
     gold_data = [
-        {"Instrument": "Nippon India Gold BeES (GOLDBEES)", "Asset": "Physical Gold", "Expense Ratio": "0.55%", "Liquidity": "⭐⭐⭐⭐⭐", "Shariah Status": "✅ 100% Halal (AAOIFI Standard 57)"},
-        {"Instrument": "HDFC Gold ETF (HDFCGOLD)", "Asset": "Physical Gold", "Expense Ratio": "0.30%", "Liquidity": "⭐⭐⭐⭐", "Shariah Status": "✅ 100% Halal"},
-        {"Instrument": "Nippon India Silver ETF (SILVERBEES)", "Asset": "Physical Silver", "Expense Ratio": "0.50%", "Liquidity": "⭐⭐⭐⭐⭐", "Shariah Status": "✅ 100% Halal"}
+        {"Instrument": "Nippon India Gold BeES (GOLDBEES)", "Asset": "Physical Gold", "Expense": "0.55%", "Shariah": "✅ Halal"},
+        {"Instrument": "HDFC Gold ETF (HDFCGOLD)", "Asset": "Physical Gold", "Expense": "0.30%", "Shariah": "✅ Halal"},
+        {"Instrument": "Nippon India Silver ETF (SILVERBEES)", "Asset": "Physical Silver", "Expense": "0.50%", "Shariah": "✅ Halal"}
     ]
     st.dataframe(pd.DataFrame(gold_data), use_container_width=True, hide_index=True)
 
 # ##################################################################
-# 📚 വിഭാഗം 6: അഡ്വൈസറി ജേർണൽ & ചേഞ്ച് ലോഗ് (Audit History)
+# 📚 വിഭാഗം 7: അഡ്വൈസറി ജേർണൽ & ചേഞ്ച് ലോഗ്
 # ##################################################################
-elif main_menu == "📚 അഡ്വൈസറി ജേർണൽ & ചേഞ്ച് ലോഗ് (Audit History)":
-    st.title("📚 ഇൻവെസ്റ്റ്മെന്റ് ജേർണൽ & ഹിസ്റ്ററി ലോഗ്")
-    st.caption("മുൻ ദിവസങ്ങളിൽ എടുത്ത തീരുമാനങ്ങളും, എന്തുകൊണ്ട് ശുപാർശ ചെയ്തു / ഒഴിവാക്കി എന്നതിന്റെ ഓഡിറ്റ് ഹിസ്റ്ററി.")
-
-    conn = sqlite3.connect(DB_NAME)
+elif main_menu == "📚 അഡ്വൈസറി ജേർണൽ & ചേഞ്ച് ലോഗ്":
+    st.title("📚 ഇൻവെസ്റ്റ്മെന്റ് ജേർണൽ & ചേഞ്ച് ലോഗ്")
     try:
-        df_audit = pd.read_sql_query("SELECT date AS Date, asset AS Asset, category AS Category, action AS Action, status AS Status, veteran_reason AS [Reason / Thesis] FROM wealth_audit ORDER BY id DESC LIMIT 50", conn)
+        conn = sqlite3.connect(DB_NAME)
+        df_audit = pd.read_sql_query("SELECT date AS Date, asset AS Asset, action AS Action, status AS Status, veteran_reason AS [Reason / Thesis] FROM wealth_audit ORDER BY id DESC LIMIT 50", conn)
         conn.close()
-        if not df_audit.empty:
-            st.dataframe(df_audit, use_container_width=True, hide_index=True)
-        else:
-            st.info("ആപ്പിൽ പുതിയ അലോക്കേഷനുകൾ പരിശോധിക്കുമ്പോൾ ഡാറ്റ ഇവിടെ ശേഖരിക്കപ്പെടും.")
-    except Exception:
-        conn.close()
-        st.info("ജേർണൽ വിവരങ്ങൾ വരാൻ കാത്തിരിക്കുന്നു...")
+        if not df_audit.empty: st.dataframe(df_audit, use_container_width=True, hide_index=True)
+        else: st.info("തീരുമാനങ്ങൾ ഇവിടെ ഓഡിറ്റ് ആയി രേഖപ്പെടുത്തും.")
+    except Exception: st.info("ഡാറ്റ വരാൻ കാത്തിരിക്കുന്നു...")
 
 # ##################################################################
-# ⚡ വിഭാഗം 7: ഇൻട്രാഡേ ട്രേഡിംഗ് ബോട്ട് (Separate Layer)
+# ⚡ വിഭാഗം 8: ഇൻട്രാഡേ ട്രേഡിംഗ് ബോട്ട്
 # ##################################################################
 elif main_menu == "⚡ ഇൻട്രാഡേ ട്രേഡിംഗ് ബോട്ട്":
     st.title("⚡ Upstox ഇൻട്രാഡേ ട്രേഡിംഗ് ബോട്ട്")
-    st.caption("നിക്ഷേപങ്ങളിൽ നിന്ന് തികച്ചും സ്വതന്ത്രമായി പ്രവർത്തിക്കുന്ന ആക്ടീവ് ഇൻട്രാഡേ എൻജിൻ.")
     if is_shariah:
         st.error("⚠️ **ശരീഅത്ത് മുന്നറിയിപ്പ്:** ഇൻട്രാഡേ ലിവറേജ് ട്രേഡിംഗും F&O-യും ഇസ്‌ലാമിക പണ്ഡിതന്മാർ വിലക്കിയിട്ടുള്ളതാണ്. ശരീഅത്ത് നിക്ഷേപകർ ദീർഘകാല ഡെലിവറി ഇക്വിറ്റിയും എത്തിക്കൽ ഫണ്ടുകളും മാത്രം തിരഞ്ഞെടുക്കുക.")
     else:
-        st.info("ഇൻട്രാഡേ ബോട്ട് ഇപ്പോൾ ബാക്ക്ഗ്രൗണ്ടിൽ നിരീക്ഷണത്തിലാണ്. മാർക്കറ്റ് സമയത്ത് സിഗ്നലുകൾക്കായി കാത്തിരിക്കുന്നു.")
+        st.info("ഇൻട്രാഡേ ബോട്ട് ബാക്ക്ഗ്രൗണ്ടിൽ നിരീക്ഷണത്തിലാണ്.")
