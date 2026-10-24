@@ -5,12 +5,57 @@ import requests
 import datetime
 import time
 import threading
+import sqlite3
 import yfinance as yf
 
-st.set_page_config(page_title="Upstox Algo Bot & Backtester", layout="wide", page_icon="📈")
+st.set_page_config(page_title="Upstox Algo Bot & Journal", layout="wide", page_icon="📈")
 
-st.title("🤖 Upstox അൽഗോരിതം ട്രേഡിങ് ബോട്ട്")
-st.caption("ക്ലൗഡിൽ തത്സമയം പ്രവർത്തിക്കുന്ന ലൈവ് ബോട്ടും 5 വർഷത്തെ ബാക്ക്ടെസ്റ്ററും.")
+st.title("🤖 Upstox അൽഗോരിതം ട്രേഡിങ് ബോട്ട് & ജേർണൽ")
+st.caption("തത്സമയ ബോട്ടും മുൻ ദിവസങ്ങളിലെ വിവരങ്ങൾ വിശകലനം ചെയ്യാനുള്ള സമ്പൂർണ്ണ ഡാറ്റാബേസും.")
+
+# ==========================================
+# 🗄️ സ്ഥിരമായ ഡാറ്റാബേസ് സെറ്റപ്പ് (SQLite Database)
+# ==========================================
+def init_db():
+    conn = sqlite3.connect("trading_journal.db")
+    c = conn.cursor()
+    c.execute('''CREATE TABLE IF NOT EXISTS audit_logs (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    date TEXT, time TEXT, symbol TEXT, price REAL,
+                    vwap REAL, rsi REAL, vol_surge TEXT, ema_cross TEXT,
+                    status TEXT, reason TEXT)''')
+    c.execute('''CREATE TABLE IF NOT EXISTS trades (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    date TEXT, time TEXT, symbol TEXT, type TEXT,
+                    buy_price REAL, sell_price REAL, qty INTEGER, pnl REAL)''')
+    conn.commit()
+    conn.close()
+
+init_db()
+
+def save_audit_log(date_str, time_str, sym, price, vwap, rsi, vol_surge, ema_cross, status, reason):
+    try:
+        conn = sqlite3.connect("trading_journal.db")
+        c = conn.cursor()
+        c.execute('''INSERT INTO audit_logs (date, time, symbol, price, vwap, rsi, vol_surge, ema_cross, status, reason)
+                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
+                  (date_str, time_str, sym, price, vwap, rsi, vol_surge, ema_cross, status, reason))
+        conn.commit()
+        conn.close()
+    except Exception:
+        pass
+
+def save_trade_record(date_str, time_str, sym, t_type, bp, sp, qty, pnl):
+    try:
+        conn = sqlite3.connect("trading_journal.db")
+        c = conn.cursor()
+        c.execute('''INSERT INTO trades (date, time, symbol, type, buy_price, sell_price, qty, pnl)
+                     VALUES (?, ?, ?, ?, ?, ?, ?, ?)''',
+                  (date_str, time_str, sym, t_type, bp, sp, qty, pnl))
+        conn.commit()
+        conn.close()
+    except Exception:
+        pass
 
 WATCHLIST = {
     'SBIN': 'NSE_EQ|INE062A01020',
@@ -19,21 +64,17 @@ WATCHLIST = {
     'LT': 'NSE_EQ|INE018A01030'
 }
 
-# ബാക്ക്ടെസ്റ്റ് ചെയ്യാനുള്ള 20 പ്രമുഖ ഓഹരികൾ
 BACKTEST_STOCKS = [
     'SBIN.NS', 'HDFCBANK.NS', 'ICICIBANK.NS', 'AXISBANK.NS', 'KOTAKBANK.NS', 'BAJFINANCE.NS',
-    'TCS.NS', 'INFY.NS', 'HCLTECH.NS', 'WIPRO.NS',
-    'M&M.NS', 'MARUTI.NS',
-    'RELIANCE.NS', 'NTPC.NS', 'POWERGRID.NS', 'ONGC.NS',
-    'LT.NS', 'TATASTEEL.NS', 'BHARTIARTL.NS', 'ITC.NS'
+    'TCS.NS', 'INFY.NS', 'HCLTECH.NS', 'WIPRO.NS', 'M&M.NS', 'MARUTI.NS',
+    'RELIANCE.NS', 'NTPC.NS', 'POWERGRID.NS', 'ONGC.NS', 'LT.NS', 'TATASTEEL.NS', 'BHARTIARTL.NS', 'ITC.NS'
 ]
 
 @st.cache_resource
 def get_global_state():
     return {
-        'running': False, 'logs': [], 'trades': [], 'pnl': 0.0,
-        'token': '', 'capital': 5000.0, 'risk': 100.0, 'mode': 'പേപ്പർ ട്രേഡിംഗ്',
-        'tg_token': '', 'tg_chat': '', 'thread': None
+        'running': False, 'token': '', 'capital': 5000.0, 'risk': 100.0,
+        'mode': 'പേപ്പർ ട്രേഡിംഗ്', 'tg_token': '', 'tg_chat': '', 'thread': None
     }
 
 state = get_global_state()
@@ -48,7 +89,6 @@ risk_input = st.sidebar.number_input("ഒരു ട്രേഡിലെ റി�
 tg_token_input = st.sidebar.text_input("Telegram Bot Token (Optional):", value=state['tg_token'], type="password")
 tg_chat_input = st.sidebar.text_input("Telegram Chat ID (Optional):", value=state['tg_chat'])
 
-# ബാക്ക്ഗ്രൗണ്ട് ലൂപ്പ് ഫംഗ്ഷനുകൾ
 def send_telegram(msg, tg_t, tg_c):
     if tg_t and tg_c:
         try:
@@ -83,6 +123,7 @@ def calculate_indicators(df):
     df['RSI'] = 100 - (100 / (1 + (close.diff().where(close.diff() > 0, 0).rolling(14).mean() / (-close.diff().where(close.diff() < 0, 0)).rolling(14).mean())))
     return df
 
+# ബാക്ക്ഗ്രൗണ്ട് ലൂപ്പ്
 def background_trading_loop():
     while state['running']:
         token = state['token']
@@ -112,7 +153,9 @@ def background_trading_loop():
             volume_surge = curr_vol >= (1.2 * vol_avg) if vol_avg > 0 else True
 
             ist_zone = datetime.timezone(datetime.timedelta(hours=5, minutes=30))
-            curr_time = datetime.datetime.now(ist_zone).strftime("%I:%M:%S %p")
+            now_ist = datetime.datetime.now(ist_zone)
+            curr_date = now_ist.strftime("%Y-%m-%d")
+            curr_time = now_ist.strftime("%I:%M:%S %p")
 
             if not above_vwap:
                 reason, status = "VWAP-ക്ക് താഴെയാണ് (Bearish)", "SKIPPED"
@@ -125,17 +168,18 @@ def background_trading_loop():
             else:
                 reason, status = "എല്ലാ ഫിൽട്ടറുകളും വിജയിച്ചു!", "🎯 BUY TRIGGERED"
                 send_telegram(f"🚀 *BUY സിഗ്നൽ:* `{symbol}` @ ₹{curr_price:.2f}", state['tg_token'], state['tg_chat'])
+                save_trade_record(curr_date, curr_time, symbol, "PAPER_BUY", curr_price, 0.0, 1, 0.0)
 
-            state['logs'].append({
-                'Time': curr_time, 'Stock': symbol, 'Price': round(curr_price, 2),
-                'VWAP': round(vwap, 2), 'RSI': round(rsi, 1), 'Status': status, 'Reason': reason
-            })
-            if len(state['logs']) > 50:
-                state['logs'].pop(0)
+            # സ്ഥിരമായി ഡാറ്റാബേസിലേക്ക് സേവ് ചെയ്യുന്നു
+            save_audit_log(curr_date, curr_time, symbol, round(curr_price, 2),
+                           round(vwap, 2), round(rsi, 1),
+                           "Yes" if volume_surge else "No",
+                           "Yes" if ema_cross else "No",
+                           status, reason)
 
         time.sleep(10)
 
-# ബട്ടണുകൾ
+# ബട്ടൺ കൺട്രോളുകൾ
 col1, col2 = st.sidebar.columns(2)
 if col1.button("▶️ START BOT", use_container_width=True):
     if not token_input:
@@ -153,154 +197,158 @@ if col1.button("▶️ START BOT", use_container_width=True):
             t = threading.Thread(target=background_trading_loop, daemon=True)
             t.start()
             state['thread'] = t
-        st.sidebar.success("ബാക്ക്ഗ്രൗണ്ട് ബോട്ട് ആരംഭിച്ചു!")
+        st.sidebar.success("ബോട്ട് ആരംഭിച്ചു!")
 
 if col2.button("⏹️ STOP BOT", use_container_width=True):
     state['running'] = False
     st.sidebar.warning("ബോട്ട് ഓഫ് ചെയ്തു!")
 
-# വിഷ്വൽ കാർഡുകൾ
-m1, m2, m3, m4 = st.columns(4)
-m1.metric("ബോട്ട് സ്റ്റാറ്റസ്", "🟢 ബാക്ക്ഗ്രൗണ്ടിൽ ഓടുന്നു" if state['running'] else "🔴 ഓഫ് ആണ്")
-m2.metric("ഇന്നത്തെ ലാഭം / നഷ്ടം", f"₹{state['pnl']:.2f}")
-m3.metric("എടുത്ത ട്രേഡുകൾ", len(state['trades']))
-m4.metric("ക്യാപിറ്റൽ", f"₹{state['capital']:.2f}")
+# ==========================================
+# 📊 4 പ്രധാന ടാബുകൾ
+# ==========================================
+tab1, tab2, tab3, tab4 = st.tabs([
+    "🔍 തത്സമയ ലോഗ്",
+    "📚 ആർക്കൈവ് & ഹിസ്റ്ററി ജേർണൽ",
+    "📜 ട്രേഡുകൾ",
+    "📊 20 സ്റ്റോക്ക് മെഗാ ബാക്ക്ടെസ്റ്റ്"
+])
 
-st.divider()
-
-# 3 പ്രധാന ടാബുകൾ
-tab1, tab2, tab3 = st.tabs(["🔍 ലൈവ് സ്കാനിംഗ് ലോഗ്", "📜 ട്രേഡുകൾ", "📊 20 സ്റ്റോക്ക് മെഗാ ബാക്ക്ടെസ്റ്റ്"])
-
+# ടാബ് 1: തത്സമയ ലോഗ്
 with tab1:
-    if state['logs']:
-        st.dataframe(pd.DataFrame(state['logs']).iloc[::-1], use_container_width=True, hide_index=True)
+    st.subheader("🟢 ഇന്നത്തെ തത്സമയ സ്കാനിംഗ് പ്രവർത്തനങ്ങൾ")
+    conn = sqlite3.connect("trading_journal.db")
+    ist_zone = datetime.timezone(datetime.timedelta(hours=5, minutes=30))
+    today_str = datetime.datetime.now(ist_zone).strftime("%Y-%m-%d")
+    df_live = pd.read_sql_query(f"SELECT time AS Time, symbol AS Stock, price AS Price, vwap AS VWAP, rsi AS RSI, vol_surge AS [Vol Surge], status AS Status, reason AS Reason FROM audit_logs WHERE date='{today_str}' ORDER BY id DESC LIMIT 50", conn)
+    conn.close()
+    if not df_live.empty:
+        st.dataframe(df_live, use_container_width=True, hide_index=True)
     else:
-        st.info("ബോട്ട് ബാക്ക്ഗ്രൗണ്ടിൽ സ്കാൻ ചെയ്യാൻ കാത്തിരിക്കുന്നു...")
+        st.info("ഇന്നത്തെ സ്കാനിംഗ് ഡാറ്റ വരാൻ കാത്തിരിക്കുന്നു...")
 
+# ടാബ് 2: കഴിഞ്ഞ ദിവസങ്ങളിലെ ഹിസ്റ്ററി ജേർണൽ (പഠിക്കാൻ വേണ്ടിയുള്ളത്)
 with tab2:
-    if state['trades']:
-        st.dataframe(pd.DataFrame(state['trades']).iloc[::-1], use_container_width=True, hide_index=True)
+    st.subheader("📚 മുൻ ദിവസങ്ങളിലെ സമ്പൂർണ്ണ ട്രേഡിംഗ് ജേർണൽ (Audit History)")
+    st.caption("മുൻപ് ബോട്ട് പ്രവർത്തിച്ച ദിവസങ്ങളിലെ എല്ലാ കണക്കുകളും പരിശോധിച്ച് പഠിക്കാനുള്ള സംവിധാനം.")
+
+    conn = sqlite3.connect("trading_journal.db")
+    dates_df = pd.read_sql_query("SELECT DISTINCT date FROM audit_logs ORDER BY date DESC", conn)
+    
+    if not dates_df.empty:
+        available_dates = dates_df['date'].tolist()
+        selected_date = st.selectbox("📅 പരിശോധിക്കേണ്ട തീയതി തിരഞ്ഞെടുക്കുക:", available_dates)
+
+        if selected_date:
+            df_hist = pd.read_sql_query(f"SELECT time AS [Time (IST)], symbol AS Stock, price AS Price, vwap AS VWAP, rsi AS RSI, vol_surge AS [Volume Surge], ema_cross AS [EMA Cross], status AS Status, reason AS [Detailed Decision / Filter Reason] FROM audit_logs WHERE date='{selected_date}' ORDER BY id DESC", conn)
+            
+            # സംഗ്രഹം
+            total_checks = len(df_hist)
+            triggers = len(df_hist[df_hist['Status'] == '🎯 BUY TRIGGERED'])
+            skips = total_checks - triggers
+
+            c_h1, c_h2, c_h3 = st.columns(3)
+            c_h1.metric("ആകെ സ്കാൻ ചെയ്തത്", total_checks)
+            c_h2.metric("ബൈ സിഗ്നൽ വന്നത്", triggers)
+            c_h3.metric("ഫിൽട്ടർ ചെയ്തത് (ഒഴിവാക്കിയത്)", skips)
+
+            st.write(f"### 📋 {selected_date}-ലെ മുഴുവൻ തീരുമാനങ്ങൾ:")
+            st.dataframe(df_hist, use_container_width=True, hide_index=True)
+
+            # എക്സൽ ഡൗൺലോഡ് ബട്ടൺ
+            csv_data = df_hist.to_csv(index=False).encode('utf-8')
+            st.download_button(
+                label=f"📥 {selected_date}-ലെ ഹിസ്റ്ററി Excel (CSV) ആയി ഡൗൺലോഡ് ചെയ്യുക",
+                data=csv_data,
+                file_name=f"trading_audit_{selected_date}.csv",
+                mime='text/csv'
+            )
+    else:
+        st.info("ഡാറ്റാബേസിൽ ഇതുവരെ പഴയ ദിവസങ്ങളിലെ ഡാറ്റ രേഖപ്പെടുത്തിയിട്ടില്ല. ബോട്ട് റൺ ചെയ്യുമ്പോൾ ഇവിടെ സ്വയം ശേഖരിക്കപ്പെടും.")
+    conn.close()
+
+# ടാബ് 3: എടുത്ത ട്രേഡുകൾ
+with tab3:
+    st.subheader("📜 പൂർത്തിയായതും നിലവിലുള്ളതുമായ ട്രേഡുകൾ")
+    conn = sqlite3.connect("trading_journal.db")
+    df_trades = pd.read_sql_query("SELECT date AS Date, time AS Time, symbol AS Stock, type AS Action, buy_price AS [Buy Price], sell_price AS [Sell Price], pnl AS PnL FROM trades ORDER BY id DESC", conn)
+    conn.close()
+    if not df_trades.empty:
+        st.dataframe(df_trades, use_container_width=True, hide_index=True)
     else:
         st.info("ഇതുവരെ ട്രേഡുകൾ ഒന്നും നടന്നിട്ടില്ല.")
 
-# ==========================================
-# 📊 ടാബ് 3: മെഗാ ബാക്ക്ടെസ്റ്റ് ഫീച്ചർ
-# ==========================================
-with tab3:
-    st.subheader("📈 20 പ്രമുഖ നിഫ്റ്റി ഓഹരികളുടെ 5 വർഷത്തെ പെർഫോമൻസ്")
-    st.caption("ബ്രോക്കറേജും നികുതികളും കുറച്ച ശേഷം ഏറ്റവും കൂടുതൽ ലാഭം തരുന്ന സ്റ്റോക്കുകളെ ഇവിടെ കണ്ടെത്താം.")
-
+# ടാബ് 4: മെഗാ ബാക്ക്ടെസ്റ്റ്
+with tab4:
+    st.subheader("📈 20 പ്രമുഖ നിഫ്റ്റി ഓഹരികളുടെ 5 വർഷത്തെ ബാക്ക്ടെസ്റ്റ്")
     if st.button("🚀 5 വർഷത്തെ മെഗാ ബാക്ക്ടെസ്റ്റ് റൺ ചെയ്യുക"):
-        with st.spinner("⏳ 20 ഓഹരികളുടെ 5 വർഷത്തെ ഡാറ്റ പരിശോധിച്ച് റാങ്ക് ചെയ്യുന്നു... ദയവായി കാത്തിരിക്കൂ..."):
+        with st.spinner("⏳ ഡാറ്റ വിശകലനം ചെയ്യുന്നു... കാത്തിരിക്കൂ..."):
             bt_results = []
-            
             def calculate_charges(buy_val, sell_val):
                 turnover = buy_val + sell_val
                 brokerage = min(20.0, buy_val * 0.0005) + min(20.0, sell_val * 0.0005)
-                stt = sell_val * 0.00025
-                exchange_charges = turnover * 0.0000345
-                sebi_charges = turnover * 0.000001
-                stamp_duty = buy_val * 0.00003
-                gst = 0.18 * (brokerage + exchange_charges + sebi_charges)
-                return brokerage + stt + exchange_charges + sebi_charges + stamp_duty + gst
-
-            def calculate_supertrend(high, low, close, period=10, multiplier=3):
-                tr = np.max(np.vstack([high[1:] - low[1:], np.abs(high[1:] - close[:-1]), np.abs(low[1:] - close[:-1])]), axis=0)
-                tr = np.insert(tr, 0, high[0] - low[0])
-                atr = pd.Series(tr).rolling(window=period).mean().to_numpy().flatten()
-                hl2 = (high + low) / 2
-                upperband = hl2 + (multiplier * atr)
-                lowerband = hl2 - (multiplier * atr)
-                direction = np.ones(len(close))
-                for i in range(period, len(close)):
-                    if float(close[i-1]) > float(upperband[i-1]):
-                        direction[i] = 1
-                    elif float(close[i-1]) < float(lowerband[i-1]):
-                        direction[i] = -1
-                    else:
-                        direction[i] = direction[i-1]
-                        if direction[i] == 1 and lowerband[i] < lowerband[i-1]:
-                            lowerband[i] = lowerband[i-1]
-                        if direction[i] == -1 and upperband[i] > upperband[i-1]:
-                            upperband[i] = upperband[i-1]
-                return direction, atr
+                return brokerage + (sell_val * 0.00025) + (turnover * 0.0000345) + (turnover * 0.000001) + (buy_val * 0.00003) + (0.18 * (brokerage + turnover * 0.0000345))
 
             for sym in BACKTEST_STOCKS:
                 try:
                     df_b = yf.download(sym, period="5y", interval="1d", auto_adjust=True, progress=False)
-                    if df_b.empty or len(df_b) < 60:
-                        continue
+                    if df_b.empty or len(df_b) < 60: continue
                     close_b = df_b['Close'].to_numpy(dtype=float).flatten()
                     high_b = df_b['High'].to_numpy(dtype=float).flatten()
                     low_b = df_b['Low'].to_numpy(dtype=float).flatten()
                     
-                    ema_50_b = pd.Series(close_b).ewm(span=50, adjust=False).mean().to_numpy().flatten()
-                    direction_b, atr_b = calculate_supertrend(high_b, low_b, close_b)
+                    tr = np.max(np.vstack([high_b[1:] - low_b[1:], np.abs(high_b[1:] - close_b[:-1]), np.abs(low_b[1:] - close_b[:-1])]), axis=0)
+                    tr = np.insert(tr, 0, high_b[0] - low_b[0])
+                    atr = pd.Series(tr).rolling(window=10).mean().to_numpy().flatten()
+                    hl2 = (high_b + low_b) / 2
+                    upperband = hl2 + (3 * atr)
+                    lowerband = hl2 - (3 * atr)
+                    direction = np.ones(len(close_b))
+                    for i in range(10, len(close_b)):
+                        if float(close_b[i-1]) > float(upperband[i-1]): direction[i] = 1
+                        elif float(close_b[i-1]) < float(lowerband[i-1]): direction[i] = -1
+                        else:
+                            direction[i] = direction[i-1]
+                            if direction[i] == 1 and lowerband[i] < lowerband[i-1]: lowerband[i] = lowerband[i-1]
+                            if direction[i] == -1 and upperband[i] > upperband[i-1]: upperband[i] = upperband[i-1]
                     
-                    cap = 5000.0
-                    peak = 5000.0
-                    max_dd = 0.0
-                    wins, losses = 0, 0
-                    win_sum, loss_sum = 0.0, 0.0
+                    ema_50_b = pd.Series(close_b).ewm(span=50, adjust=False).mean().to_numpy().flatten()
+                    cap, wins, losses, win_s, loss_s = 5000.0, 0, 0, 0.0, 0.0
                     in_p, bp, sl, tg, qty = False, 0, 0, 0, 0
                     trailed = False
 
                     for i in range(50, len(close_b)):
-                        cp = float(close_b[i])
-                        c_atr = float(atr_b[i]) if not np.isnan(atr_b[i]) else (cp * 0.02)
-                        
+                        cp, c_atr = float(close_b[i]), float(atr[i]) if not np.isnan(atr[i]) else (float(close_b[i]) * 0.02)
                         if not in_p:
-                            if (direction_b[i-1] == -1 and direction_b[i] == 1) and (cp > ema_50_b[i]):
-                                in_p = True
-                                bp = cp
-                                qty = max(1, int(cap // bp))
-                                sl = bp - (1.5 * c_atr)
-                                tg = bp + (3.0 * c_atr)
-                                trailed = False
+                            if (direction[i-1] == -1 and direction[i] == 1) and (cp > ema_50_b[i]):
+                                in_p, bp, qty = True, cp, max(1, int(cap // cp))
+                                sl, tg, trailed = bp - (1.5 * c_atr), bp + (3.0 * c_atr), False
                                 continue
                         if in_p:
                             done, sp = False, 0
-                            if not trailed and cp >= (bp + (1.5 * c_atr)):
-                                sl = bp
-                                trailed = True
-                            if cp >= tg:
-                                sp, done, wins = tg, True, wins + 1
-                            elif cp <= sl:
-                                sp, done, losses = sl, True, losses + 1
-
+                            if not trailed and cp >= (bp + (1.5 * c_atr)): sl, trailed = bp, True
+                            if cp >= tg: sp, done, wins = tg, True, wins + 1
+                            elif cp <= sl: sp, done, losses = sl, True, losses + 1
                             if done:
                                 net = ((sp - bp) * qty) - calculate_charges(bp * qty, sp * qty)
                                 cap += net
-                                if net > 0: win_sum += net
-                                else: loss_sum += abs(net)
-                                if cap > peak: peak = cap
-                                dd = (peak - cap) / peak * 100
-                                if dd > max_dd: max_dd = dd
+                                if net > 0: win_s += net
+                                else: loss_s += abs(net)
                                 in_p = False
 
                     tot = wins + losses
                     if tot > 0:
-                        pf = round(win_sum / loss_sum, 2) if loss_sum > 0 else 99.0
                         bt_results.append({
-                            'Stock': sym.replace('.NS', ''),
-                            'Trades': tot, 'Wins': wins, 'Losses': losses,
+                            'Stock': sym.replace('.NS', ''), 'Trades': tot, 'Wins': wins, 'Losses': losses,
                             'Win Rate (%)': round((wins/tot)*100, 1),
-                            'Profit Factor': pf,
-                            'Max Drawdown (%)': round(max_dd, 1),
-                            'Net Profit (₹)': round(cap - 5000.0, 2),
-                            'Final Capital (₹)': round(cap, 2)
+                            'Profit Factor': round(win_s / loss_s, 2) if loss_s > 0 else 99.0,
+                            'Net Profit (₹)': round(cap - 5000.0, 2)
                         })
-                except Exception:
-                    continue
+                except Exception: continue
 
             if bt_results:
-                res_df = pd.DataFrame(bt_results).sort_values(by=['Net Profit (₹)', 'Win Rate (%)'], ascending=[False, False])
-                st.success("✅ 20 ഓഹരികളുടെ മെഗാ ബാക്ക്ടെസ്റ്റ് പൂർത്തിയായി! റാങ്ക് ലിസ്റ്റ് താഴെ കാണാം:")
-                st.dataframe(res_df, use_container_width=True, hide_index=True)
-            else:
-                st.error("ഡാറ്റ ലഭിച്ചില്ല. ദയവായി വീണ്ടും ശ്രമിക്കുക.")
+                st.dataframe(pd.DataFrame(bt_results).sort_values(by=['Net Profit (₹)'], ascending=False), use_container_width=True, hide_index=True)
 
-# ഓട്ടോ അപ്‌ഡേറ്റ്
+# സ്ക്രീനിൽ നിൽക്കുമ്പോൾ തനിയെ അപ്‌ഡേറ്റ് ആകാൻ
 if state['running']:
     time.sleep(5)
     st.rerun()
