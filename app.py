@@ -11,7 +11,7 @@ import yfinance as yf
 st.set_page_config(page_title="Complete Wealth & Trading Hub", layout="wide", page_icon="🏦")
 
 # ==========================================
-# 🗄️ ഡാറ്റാബേസ് സെറ്റപ്പ്
+# 🗄️ ഡാറ്റാബേസ് സെറ്റപ്പ് (v2)
 # ==========================================
 DB_NAME = "trading_journal_v2.db"
 
@@ -60,12 +60,16 @@ def save_trade_record(date_str, time_str, sym, t_type, bp, sp, qty, pnl):
         pass
 
 # ==========================================
-# 🧭 പ്രധാന നാവിഗേഷൻ മെനു (Separate Hubs)
+# 🧭 പ്രധാന നാവിഗേഷൻ മെനു
 # ==========================================
 st.sidebar.title("🏦 വെൽത്ത് & ട്രേഡിംഗ് ഹബ്")
 main_menu = st.sidebar.radio(
     "നിങ്ങൾക്ക് ആവശ്യമുള്ള വിഭാഗം തിരഞ്ഞെടുക്കുക:",
-    ["⚡ ഇൻട്രാഡേ ട്രേഡിംഗ് ബോട്ട്", "💎 ദീർഘകാല ഓഹരികൾ (Value & Growth)", "📈 മികച്ച മ്യൂച്വൽ ഫണ്ടുകൾ (SIP)"]
+    [
+        "⚡ ഇൻട്രാഡേ ട്രേഡിംഗ് ബോട്ട്",
+        "🏛️ 50-Year Veteran ദീർഘകാല നിക്ഷേപം (AI-Proof)",
+        "📈 മികച്ച മ്യൂച്വൽ ഫണ്ടുകൾ (SIP)"
+    ]
 )
 
 WATCHLIST = {
@@ -92,7 +96,7 @@ state = get_global_state()
 # ##################################################################
 if main_menu == "⚡ ഇൻട്രാഡേ ട്രേഡിംഗ് ബോട്ട്":
     st.title("⚡ Upstox ഇൻസ്റ്റിറ്റ്യൂഷണൽ ഇൻട്രാഡേ ബോട്ട്")
-    st.caption("ഇൻട്രാഡേ അവസരങ്ങൾ കണ്ടെത്താനും കർശനമായ റിസ്ക് മാനേജ്മെന്റോടെ ട്രേഡ് ചെയ്യാനുമുള്ള സിസ്റ്റം.")
+    st.caption("കർശനമായ റിസ്ക് മാനേജ്മെന്റോടെയുള്ള ഓട്ടോമാറ്റിക് ഇൻട്രാഡേ സിസ്റ്റം (Nifty Guard + Kill Switch + 45m Exit).")
 
     st.sidebar.markdown("---")
     st.sidebar.subheader("⚙️ ബോട്ട് കൺട്രോൾ")
@@ -256,7 +260,7 @@ if main_menu == "⚡ ഇൻട്രാഡേ ട്രേഡിംഗ് ബോ
 
     st.divider()
 
-    t1, t2, t3 = st.tabs(["🔍 തത്സമയ ലോഗ്", "📚 ആർക്കൈവ് & ഹിസ്റ്ററി ജേർണൽ", "📜 ട്രേഡുകൾ"])
+    t1, t2, t3 = st.tabs(["🔍 തത്സമയ ലോഗ് & നിഫ്റ്റി ഗാർഡ്", "📚 ആർക്കൈവ് & ഹിസ്റ്ററി ജേർണൽ", "📜 ട്രേഡുകൾ"])
     with t1:
         try:
             conn = sqlite3.connect(DB_NAME)
@@ -290,54 +294,138 @@ if main_menu == "⚡ ഇൻട്രാഡേ ട്രേഡിംഗ് ബോ
         except Exception: st.info("ട്രേഡുകൾ ഒന്നും നടന്നിട്ടില്ല.")
 
 # ##################################################################
-# 💎 വിഭാഗം 2: ദീർഘകാല ഓഹരികൾ (Value & Growth Stock Finder)
+# 🏛️ വിഭാഗം 2: 50-Year Veteran ദീർഘകാല നിക്ഷേപം (AI-Proof Framework)
 # ##################################################################
-elif main_menu == "💎 ദീർഘകാല ഓഹരികൾ (Value & Growth)":
-    st.title("💎 ദീർഘകാല ഓഹരി നിക്ഷേപം (Long-Term Stocks)")
-    st.caption("5 മുതൽ 10 വർഷത്തേക്ക് മികച്ച സമ്പത്തുണ്ടാക്കാൻ സഹായിക്കുന്ന വാല്യൂ, ഗ്രോത്ത് ഓഹരികൾ കണ്ടെത്തുക.")
+elif main_menu == "🏛️ 50-Year Veteran ദീർഘകാല നിക്ഷേപം (AI-Proof)":
+    st.title("🏛️ 50-Year Veteran ദീർഘകാല വെൽത്ത് നിലവറ")
+    st.caption("വാറൻ ബഫറ്റ് ശൈലി: കടമില്ലാത്ത, ശക്തമായ കുത്തകയുള്ള, എഐ (AI) ഭീഷണിയില്ലാത്ത ഇന്ത്യയിലെ ഏറ്റവും കരുത്തുറ്റ കമ്പനികൾ.")
 
-    stock_type = st.radio("നിങ്ങൾക്ക് താല്പര്യമുള്ള തരം തിരഞ്ഞെടുക്കുക:", ["🏛️ വാല്യൂ ഓഹരികൾ (Value Stocks - വാറൻ ബഫറ്റ് ശൈലി)", "🚀 ഗ്രോത്ത് ഓഹരികൾ (High Growth Stocks)"], horizontal=True)
+    v_tab1, v_tab2, v_tab3 = st.tabs([
+        "🛡️ ഓൾ-വെതർ കുത്തകകൾ (Crash & AI Proof)",
+        "⚡ എഐ യുഗത്തിൽ കുതിക്കുന്നവ (AI Beneficiaries)",
+        "⚠️ എഐ വാല്യൂ ട്രാപ്പ് മുന്നറിയിപ്പ് (The Warning Checklist)"
+    ])
 
-    if "വാല്യൂ ഓഹരികൾ" in stock_type:
-        st.subheader("🏛️ വാല്യൂ ഓഹരികൾ (Undervalued Quality Stocks)")
+    with v_tab1:
+        st.subheader("🛡️ ഓൾ-വെതർ കുത്തകകൾ (മാർക്കറ്റ് വീണാലും ഉറച്ചുനിൽക്കുന്നവ)")
         st.markdown("""
-        **എന്താണ് വാല്യൂ സ്റ്റോക്കുകൾ?**
-        ശക്തമായ ഫണ്ടമെന്റലുകൾ ഉള്ളതും, എന്നാൽ മാർക്കറ്റിൽ ന്യായമായ വിലയിൽ (Fair / Cheap Valuation) ലഭിക്കുന്നതുമായ ഓഹരികൾ.
-        * **മാനദണ്ഡങ്ങൾ:** P/E < 25, Debt/Equity < 0.5 (കുറഞ്ഞ കടം), ROE > 15%, ഉയർന്ന ലാഭം.
+        **50-വർഷത്തെ വിദഗ്ദ്ധ മാനദണ്ഡം:**
+        * **പൂജ്യം കടം (Zero Debt):** പലിശ ഭാരമില്ലാത്തതിനാൽ സാമ്പത്തിക മാന്ദ്യത്തിലും കമ്പനി തകരില്ല.
+        * **ROCE > 25%:** ബിസിനസ്സിൽ നിക്ഷേപിക്കുന്ന ഓരോ രൂപയ്ക്കും അത്യുഗ്രൻ റിട്ടേൺ.
+        * **പ്രൈസിംഗ് പവർ (Pricing Power):** പണപ്പെരുപ്പമോ ചെലവുകളോ കൂടിയാൽ വില വർദ്ധിപ്പിക്കാൻ സാധിക്കുന്ന കുത്തക ശക്തി.
         """)
 
-        value_data = [
-            {"Stock": "ITC", "Sector": "FMCG / Tobacco", "P/E": 26.5, "ROE (%)": 29.1, "Debt/Equity": 0.0, "Dividend Yield (%)": 3.2, "Strengths": "പൂർണ്ണമായും കടമില്ലാത്ത കമ്പനി, ഉയർന്ന ക്യാഷ് ഫ്ലോ, മികച്ച ഡിവിഡന്റ്"},
-            {"Stock": "State Bank of India (SBIN)", "Sector": "Banking", "P/E": 11.2, "ROE (%)": 18.5, "Debt/Equity": 0.8, "Dividend Yield (%)": 1.6, "Strengths": "ഇന്ത്യയിലെ ഏറ്റവും വലിയ ബാങ്ക്, കുറഞ്ഞ P/E വാല്യുവേഷൻ"},
-            {"Stock": "Coal India", "Sector": "Energy / Mining", "P/E": 8.5, "ROE (%)": 52.0, "Debt/Equity": 0.1, "Dividend Yield (%)": 5.8, "Strengths": "ഏറ്റവും ഉയർന്ന ഡിവിഡന്റ്, സർക്കാരിന്റെ കുത്തക ബിസിനസ്സ്"},
-            {"Stock": "Larsen & Toubro (LT)", "Sector": "Infrastructure", "P/E": 32.0, "ROE (%)": 16.2, "Debt/Equity": 0.6, "Dividend Yield (%)": 1.1, "Strengths": "ഇന്ത്യയുടെ വികസനത്തിൽ ഏറ്റവും മുൻനിരയിലുള്ള ഇൻഫ്രാ ഭീമൻ"},
-            {"Stock": "HCL Technologies", "Sector": "IT Services", "P/E": 24.1, "ROE (%)": 23.5, "Debt/Equity": 0.1, "Dividend Yield (%)": 3.0, "Strengths": "സ്ഥിരമായ റിട്ടേൺ, മികച്ച ഡിവിഡന്റ്, AI രംഗത്തെ വളർച്ച"}
+        all_weather_stocks = [
+            {
+                "Stock": "CDSL (Central Depository)",
+                "Moat Type": "റെഗുലേറ്ററി കുത്തക (Duopoly)",
+                "ROCE (%)": "33.5%",
+                "Debt / Equity": "0.0 (പൂർണ്ണ കടരഹിതം)",
+                "AI Disruption Risk": "🟢 പൂജ്യം (Zero Risk)",
+                "Crash Resilience": "⭐⭐⭐⭐⭐ (Highest)",
+                "Veteran Thesis": "ഇന്ത്യക്കാർ ഡിമാറ്റ് അക്കൗണ്ട് എടുക്കുന്നിടത്തോളം കാലം, ട്രേഡ് ചെയ്യുന്നിടത്തോളം കാലം ഒരു ടോൾ ബൂത്ത് പോലെ വരുമാനം നേടുന്നു."
+            },
+            {
+                "Stock": "CAMS (Computer Age Management)",
+                "Moat Type": "ഡാറ്റ & പ്രോസസ്സിംഗ് കുത്തക",
+                "ROCE (%)": "44.2%",
+                "Debt / Equity": "0.0 (പൂർണ്ണ കടരഹിതം)",
+                "AI Disruption Risk": "🟢 പൂജ്യം (Zero Risk)",
+                "Crash Resilience": "⭐⭐⭐⭐⭐ (Highest)",
+                "Veteran Thesis": "ഇന്ത്യയിലെ 70% മ്യൂച്വൽ ഫണ്ടുകളുടെയും ബാക്ക്-എൻഡ് നിയന്ത്രിക്കുന്നു. ആളുകൾ SIP ചെയ്യുന്ന ഓരോ മാസവും CAMS പണം ഉണ്ടാക്കുന്നു."
+            },
+            {
+                "Stock": "HAL (Hindustan Aeronautics)",
+                "Moat Type": "പ്രതിരോധ കുത്തക (Monopoly)",
+                "ROCE (%)": "31.8%",
+                "Debt / Equity": "0.0 (പൂർണ്ണ കടരഹിതം)",
+                "AI Disruption Risk": "🟢 പൂജ്യം (AI cannot build jets)",
+                "Crash Resilience": "⭐⭐⭐⭐⭐ (Highest)",
+                "Veteran Thesis": "ഇന്ത്യൻ വ്യോമസേനയ്ക്ക് ആവശ്യമായ ഫൈറ്റർ ജെറ്റുകളും ഹെലികോപ്റ്ററുകളും നിർമ്മിക്കാൻ മറ്റാർക്കും അനുമതിയില്ല. 10 വർഷത്തെ ഓർഡർ ബുക്ക്."
+            },
+            {
+                "Stock": "ITC Limited",
+                "Moat Type": "ഉപഭോക്തൃ കുത്തക (Cash Machine)",
+                "ROCE (%)": "39.1%",
+                "Debt / Equity": "0.0 (പൂർണ്ണ കടരഹിതം)",
+                "AI Disruption Risk": "🟢 പൂജ്യം (Zero Risk)",
+                "Crash Resilience": "⭐⭐⭐⭐⭐ (Highest)",
+                "Veteran Thesis": "ഭീമമായ ഫ്രീ ക്യാഷ് ഫ്ലോ. മാർക്കറ്റ് തകരുമ്പോഴും 3%-ൽ കൂടുതൽ ഡിവിഡന്റ് നൽകുന്ന സുരക്ഷിത താവളം."
+            },
+            {
+                "Stock": "Sun Pharmaceutical",
+                "Moat Type": "ഇലാസ്തികതയില്ലാത്ത ഡിമാൻഡ് (Pharma)",
+                "ROCE (%)": "17.8%",
+                "Debt / Equity": "0.05 (നെഗ്ലിജിബിൾ)",
+                "AI Disruption Risk": "🟢 പൂജ്യം (മരുന്നുകൾ ഫിസിക്കൽ ആണ്)",
+                "Crash Resilience": "⭐⭐⭐⭐ (High)",
+                "Veteran Thesis": "ആഗോള തലത്തിൽ അസുഖങ്ങൾക്ക് മരുന്ന് കഴിക്കാതിരിക്കാൻ മനുഷ്യർക്ക് കഴിയില്ല. മാർക്കറ്റ് തകർച്ചകളിൽ റെസഷൻ-പ്രൂഫ് ആണ്."
+            }
         ]
-        st.dataframe(pd.DataFrame(value_data), use_container_width=True, hide_index=True)
+        st.dataframe(pd.DataFrame(all_weather_stocks), use_container_width=True, hide_index=True)
 
-    else:
-        st.subheader("🚀 ഗ്രോത്ത് ഓഹരികൾ (High Compounding Stocks)")
+    with v_tab2:
+        st.subheader("⚡ എഐ യുഗത്തിൽ ഡിമാൻഡ് ഇരട്ടിയാകുന്ന വൻകിട കമ്പനികൾ")
         st.markdown("""
-        **എന്താണ് ഗ്രോത്ത് സ്റ്റോക്കുകൾ?**
-        വർഷം തോറും 15%-25% വേഗതയിൽ വിറ്റുവരവും ലാഭവും വർദ്ധിപ്പിക്കുന്ന, മാർക്കറ്റിന്റെ കുതിപ്പിന് നേതൃത്വം നൽകുന്ന കമ്പനികൾ.
-        * **മാനദണ്ഡങ്ങൾ:** 3Y Sales Growth > 15%, 3Y Profit Growth > 20%, ഉയർന്ന വിപണി മേധാവിത്വം (Market Moat).
+        **50-വർഷത്തെ വിദഗ്ദ്ധ നിരീക്ഷണം:**
+        * AI സോഫ്റ്റ്‌വെയറുകൾക്ക് പ്രവർത്തിക്കാൻ **അതിഭീമമായ പവറും (Power / Electricity), ഹൈ-വോൾട്ടേജ് ട്രാൻസ്മിഷനും, വൻകിട ഫിസിക്കൽ ഇൻഫ്രാസ്ട്രക്ചറും** വേണം.
+        * അതിനാൽ AI കൂടുതൽ വികസിക്കുന്തോറും താഴെ പറയുന്ന കമ്പനികളുടെ ഡിമാൻഡ് കുതിച്ചുയരും:
         """)
 
-        growth_data = [
-            {"Stock": "Tata Motors", "Sector": "Automobile / EV", "3Y Profit Growth": "45%+", "Market Moat": "EV വിപണിയിലെ ഒന്നാം സ്ഥാനം, JLR ആഗോള കുതിപ്പ്", "Risk Level": "ഇടത്തരം (Medium)"},
-            {"Stock": "Titan Company", "Sector": "Retail / Jewellery", "3Y Profit Growth": "22%+", "Market Moat": "ടാറ്റാ ബ്രാൻഡ് വിശ്വാസ്യത, ജ്വല്ലറി വിപണിയിലെ ആധിപത്യം", "Risk Level": "കുറഞ്ഞ റിസ്ക് (Low)"},
-            {"Stock": "Bajaj Finance", "Sector": "NBFC / Fintech", "3Y Profit Growth": "28%+", "Market Moat": "ഇന്ത്യയിലെ ഏറ്റവും വലിയ കൺസ്യൂമർ ഫിനാൻസ് ലെൻഡർ", "Risk Level": "ഇടത്തരം (Medium)"},
-            {"Stock": "Trent (Westside / Zudio)", "Sector": "Retail Fashion", "3Y Profit Growth": "50%+", "Market Moat": "Zudio-യുടെ അതിവേഗ സ്റ്റോർ വിപുലീകരണവും അത്യുഗ്രൻ വളർച്ചയും", "Risk Level": "ഉയർന്ന വളർച്ച (High Growth)"},
-            {"Stock": "Bharti Airtel", "Sector": "Telecom / 5G", "3Y Profit Growth": "30%+", "Market Moat": "ഡാറ്റാ ഉപയോഗത്തിലെ വർദ്ധനവ്, സ്ഥിരമായ ARPU വളർച്ച", "Risk Level": "കുറഞ്ഞ റിസ്ക് (Low)"}
+        ai_beneficiaries = [
+            {
+                "Stock": "Power Grid Corp (PGCIL)",
+                "Core Moat": "ഇന്ത്യയുടെ പവർ ട്രാൻസ്മിഷൻ കുത്തക (~85% വിപണി)",
+                "Why AI Drives Demand?": "AI ഡാറ്റാ സെന്ററുകൾക്ക് 24 മണിക്കൂറും തടസ്സമില്ലാത്ത ഹൈ-വോൾട്ടേജ് വൈദ്യുതി ആവശ്യമാണ്. ഇവ എത്തിക്കാൻ പവർഗ്രിഡ് അല്ലാതെ മറ്റൊരു ബദലില്ല.",
+                "Dividend Yield": "3.5%+",
+                "Balance Sheet": "സ്ഥിരമായ ക്യാഷ് ഫ്ലോ, സർക്കാർ പിന്തുണ"
+            },
+            {
+                "Stock": "NTPC Limited",
+                "Core Moat": "ഇന്ത്യയിലെ ഏറ്റവും വലിയ വൈദ്യുതി ഉൽപ്പാദകൻ",
+                "Why AI Drives Demand?": "ക്ലൗഡ് സെർവറുകൾക്ക് ആവശ്യമായ ബേസ്‌ലോഡ് പവറും ഗ്രീൻ ഹൈഡ്രജനും വിതരണം ചെയ്യാൻ ശേഷിയുള്ള ഏക ഭീമൻ.",
+                "Dividend Yield": "3.0%+",
+                "Balance Sheet": "വലിയ തോതിലുള്ള ഗ്രീൻ എനർജി വിപുലീകരണം"
+            },
+            {
+                "Stock": "Larsen & Toubro (L&T)",
+                "Core Moat": "ഇന്ത്യയിലെ ഏറ്റവും വലിയ ഹൈ-ടെക് നിർമ്മാണ കമ്പനി",
+                "Why AI Drives Demand?": "ഡാറ്റാ സെന്ററുകൾ, സെമികണ്ടക്ടർ ചിപ്പ് ഫാക്ടറികൾ, ഹൈ-സ്പീഡ് ഇൻഫ്രാസ്ട്രക്ചർ എന്നിവ നിർമ്മിക്കാൻ കഴിവുള്ള ഒരേയൊരു ഇന്ത്യൻ കമ്പനി.",
+                "Dividend Yield": "1.2%",
+                "Balance Sheet": "₹5 ലക്ഷം കോടിയുടെ കൂറ്റൻ ഓർഡർ ബുക്ക്"
+            },
+            {
+                "Stock": "Bharti Airtel",
+                "Core Moat": "ഡിജിറ്റൽ ഡാറ്റാ ഹൈവേ (Telecom Duopoly)",
+                "Why AI Drives Demand?": "AI മോഡലുകൾ വഴി വൻതോതിലുള്ള ഡാറ്റ മൊബൈലുകളിലേക്കും സെർവറുകളിലേക്കും കൈമാറാൻ 5G സ്പെക്‌ട്രവും ഒപ്റ്റിക് ഫൈബറും ഉടമസ്ഥതയിലുള്ള ഭീമൻ.",
+                "Dividend Yield": "1.0%",
+                "Balance Sheet": "സ്ഥിരമായി വർദ്ധിക്കുന്ന പ്രതിമാസ വരുമാനം (ARPU)"
+            }
         ]
-        st.dataframe(pd.DataFrame(growth_data), use_container_width=True, hide_index=True)
+        st.dataframe(pd.DataFrame(ai_beneficiaries), use_container_width=True, hide_index=True)
+
+    with v_tab3:
+        st.subheader("⚠️ എഐ വാല്യൂ ട്രാപ്പ് മുന്നറിയിപ്പ് (The Warning Checklist)")
+        st.error("""
+        **50-വർഷത്തെ പരിചയമുള്ള ഒരു ഇൻവെസ്റ്ററുടെ മുന്നറിയിപ്പ്: താഴെ പറയുന്ന കമ്പനികൾ എത്ര വില കുറഞ്ഞാലും വാങ്ങരുത്!**
+        """)
+        st.markdown("""
+        1. **❌ ജനറിക് ഐടി ഔട്ട്‌സോഴ്സിംഗ് (Low-End IT / Body Shopping):**
+           * അടിസ്ഥാന കോഡിംഗ്, ഡാറ്റ എൻട്രി, ലളിതമായ സോഫ്റ്റ്‌വെയർ മെയിന്റനൻസ് എന്നിവ ചെയ്യുന്ന കമ്പനികൾ AI കാരണം തകരും. ഇവയുടെ P/E 10-ൽ താഴെ വന്നാൽ പോലും അത് വാല്യൂ ട്രാപ്പ് ആണ്.
+        2. **❌ വലിയ കടബാധ്യതയുള്ള കമ്പനികൾ (High Debt Businesses):**
+           * Debt to Equity > 1.5 ഉള്ള കമ്പനികൾ മാർക്കറ്റ് തകർച്ചയിൽ പലിശ താങ്ങാനാവാതെ പാപ്പരാകും.
+        3. **❌ പ്രൈസിംഗ് പവർ ഇല്ലാത്ത ഇടനിലക്കാർ (Commodity Middlemen):**
+           * തങ്ങളുടെ ഉൽപ്പന്നത്തിന് സ്വന്തമായി വില നിശ്ചയിക്കാൻ കഴിയാത്ത, മറ്റുള്ളവർ നൽകുന്ന വിലയ്ക്ക് സാധനങ്ങൾ വിൽക്കാൻ നിർബന്ധിതരാകുന്ന കമ്പനികൾ.
+        4. **❌ ഫ്രീ ക്യാഷ് ഫ്ലോ ഇല്ലാത്തവ (No Real Cash):**
+           * ബാലൻസ് ഷീറ്റിൽ കടലാസ് ലാഭം മാത്രം കാണിച്ച്, ബാങ്ക് അക്കൗണ്ടിൽ യഥാർത്ഥ പണമില്ലാത്ത ബിസിനസ്സുകൾ.
+        """)
 
 # ##################################################################
-# 📈 വിഭാഗം 3: മികച്ച മ്യൂച്വൽ ഫണ്ടുകൾ (Top Mutual Funds & SIP)
+# 📈 വിഭാഗം 3: മികച്ച മ്യൂച്വൽ ഫണ്ടുകൾ (SIP)
 # ##################################################################
 elif main_menu == "📈 മികച്ച മ്യൂച്വൽ ഫണ്ടുകൾ (SIP)":
     st.title("📈 മികച്ച മ്യൂച്വൽ ഫണ്ടുകൾ (Top Mutual Funds)")
-    st.caption("ടെൻഷനില്ലാതെ മാസ നിക്ഷേപം (SIP) വഴി ദീർഘകാല സമ്പത്ത് സൃഷ്ടിക്കാൻ അനുയോജ്യമായ ഫണ്ടുകൾ.")
+    st.caption("ദീർഘകാലത്തേക്ക് സ്ഥിരതയോടെ കോടികളുടെ വെൽത്ത് സൃഷ്ടിക്കാൻ തെരഞ്ഞെടുത്ത ഫണ്ടുകൾ.")
 
     mf_category = st.selectbox(
         "നിക്ഷേപ വിഭാഗം തിരഞ്ഞെടുക്കുക:",
@@ -346,36 +434,32 @@ elif main_menu == "📈 മികച്ച മ്യൂച്വൽ ഫണ്ട
 
     if "ഫ്ലെക്സി ക്യാപ്" in mf_category:
         st.subheader("🌟 മികച്ച ഫ്ലെക്സി ക്യാപ് ഫണ്ടുകൾ (Flexi Cap Funds)")
-        st.info("💡 ഫണ്ട് മാനേജർക്ക് ലാർജ്, മിഡ്, സ്മോൾ ക്യാപ് ഓഹരികളിൽ എവിടെ വേണമെങ്കിലും അവസരത്തിനൊത്ത് നിക്ഷേപിക്കാനുള്ള സ്വാതന്ത്ര്യമുണ്ട്. തുടക്കക്കാർക്ക് ഏറ്റവും മികച്ച ചോയ്‌സ് ഇതാണ്.")
+        st.info("💡 ഫണ്ട് മാനേജർക്ക് ലാർജ്, മിഡ്, സ്മോൾ ക്യാപ് ഓഹരികളിൽ എവിടെ വേണമെങ്കിലും അവസരത്തിനൊത്ത് നിക്ഷേപിക്കാനുള്ള സ്വാതന്ത്ര്യമുണ്ട്.")
         funds = [
-            {"Fund Name": "Parag Parikh Flexi Cap Fund", "3Y Return (CAGR)": "21.5%", "5Y Return (CAGR)": "24.2%", "Expense Ratio": "0.62%", "Risk": "മിതമായ റിസ്ക് (Moderate)"},
-            {"Fund Name": "HDFC Flexi Cap Fund", "3Y Return (CAGR)": "25.1%", "5Y Return (CAGR)": "22.8%", "Expense Ratio": "0.85%", "Risk": "മിതമായ റിസ്ക് (Moderate)"},
-            {"Fund Name": "JM Flexicap Fund", "3Y Return (CAGR)": "32.0%", "5Y Return (CAGR)": "26.4%", "Expense Ratio": "0.55%", "Risk": "ഉയർന്ന വളർച്ച (Aggressive)"}
+            {"Fund Name": "Parag Parikh Flexi Cap Fund", "3Y CAGR": "21.5%", "5Y CAGR": "24.2%", "Expense Ratio": "0.62%", "Risk": "മിതമായ റിസ്ക് (Moderate)", "Why Invest?": "വിദേശ ഓഹരികളിലും വാല്യൂ ഓഹരികളിലും മിതത്വത്തോടെയുള്ള നിക്ഷേപം."},
+            {"Fund Name": "HDFC Flexi Cap Fund", "3Y CAGR": "25.1%", "5Y CAGR": "22.8%", "Expense Ratio": "0.85%", "Risk": "മിതമായ റിസ്ക് (Moderate)", "Why Invest?": "ഇന്ത്യയിലെ ഏറ്റവും വിശ്വസനീയമായ ഫണ്ട് ഹൗസ്, സ്ഥിരതയാർന്ന ചരിത്രം."},
+            {"Fund Name": "JM Flexicap Fund", "3Y CAGR": "32.0%", "5Y CAGR": "26.4%", "Expense Ratio": "0.55%", "Risk": "ഉയർന്ന വളർച്ച (Aggressive)", "Why Invest?": "മൊമെന്റം ഉള്ള വളർച്ചാ ഓഹരികളെ കൃത്യമായി കണ്ടെത്തുന്നു."}
         ]
         st.dataframe(pd.DataFrame(funds), use_container_width=True, hide_index=True)
 
     elif "ലാർജ് ക്യാപ്" in mf_category:
         st.subheader("🛡️ ലാർജ് ക്യാപ് & ഇൻഡെക്സ് ഫണ്ടുകൾ (Large Cap & Nifty 50)")
-        st.info("💡 ഇന്ത്യയിലെ മുൻനിര 50 വൻകിട കമ്പനികളിൽ നിക്ഷേപിക്കുന്നു. ബാങ്ക് FD-യേക്കാൾ ഉയർന്ന വളർച്ചയും കുറഞ്ഞ റിസ്കും തരുന്നു.")
         funds = [
-            {"Fund Name": "UTI Nifty 50 Index Fund", "3Y Return (CAGR)": "15.8%", "5Y Return (CAGR)": "16.5%", "Expense Ratio": "0.18%", "Risk": "കുറഞ്ഞ റിസ്ക് (Low)"},
-            {"Fund Name": "HDFC Top 100 Fund", "3Y Return (CAGR)": "21.2%", "5Y Return (CAGR)": "18.2%", "Expense Ratio": "0.98%", "Risk": "കുറഞ്ഞ റിസ്ക് (Low)"},
-            {"Fund Name": "ICICI Prudential Bluechip Fund", "3Y Return (CAGR)": "19.5%", "5Y Return (CAGR)": "17.4%", "Expense Ratio": "0.89%", "Risk": "കുറഞ്ഞ റിസ്ക് (Low)"}
+            {"Fund Name": "UTI Nifty 50 Index Fund", "3Y CAGR": "15.8%", "5Y CAGR": "16.5%", "Expense Ratio": "0.18%", "Risk": "കുറഞ്ഞ റിസ്ക് (Low)", "Why Invest?": "ഏറ്റവും കുറഞ്ഞ ചിലവ് (0.18%), നിഫ്റ്റി 50 കമ്പനികളുടെ മുഴുവൻ വളർച്ചയും കിട്ടുന്നു."},
+            {"Fund Name": "HDFC Top 100 Fund", "3Y CAGR": "21.2%", "5Y CAGR": "18.2%", "Expense Ratio": "0.98%", "Risk": "കുറഞ്ഞ റിസ്ക് (Low)", "Why Invest?": "ഇന്ത്യയിലെ മുൻനിര 100 വൻകിട കമ്പനികളിലെ സുരക്ഷിത നിക്ഷേപം."}
         ]
         st.dataframe(pd.DataFrame(funds), use_container_width=True, hide_index=True)
 
     else:
         st.subheader("🚀 മിഡ് & സ്മോൾ ക്യാപ് ഫണ്ടുകൾ (Mid & Small Cap Funds)")
-        st.warning("⚠️ ശ്രദ്ധിക്കുക: ഈ ഫണ്ടുകളിൽ റിസ്ക് കൂടുതലാണ്. കുറഞ്ഞത് 7 വർഷമെങ്കിലും ഹോൾഡ് ചെയ്യാൻ ഉദ്ദേശിക്കുന്നവർ മാത്രം ഇതിൽ നിക്ഷേപിക്കുക.")
+        st.warning("⚠️ ശ്രദ്ധിക്കുക: കുറഞ്ഞത് 7 വർഷമെങ്കിലും ഹോൾഡ് ചെയ്യാൻ ഉദ്ദേശിക്കുന്നവർ മാത്രം ഇതിൽ നിക്ഷേപിക്കുക.")
         funds = [
-            {"Fund Name": "Quant Small Cap Fund", "3Y Return (CAGR)": "34.2%", "5Y Return (CAGR)": "38.5%", "Expense Ratio": "0.77%", "Risk": "വളരെ ഉയർന്ന റിസ്ക് (Very High)"},
-            {"Fund Name": "Nippon India Small Cap Fund", "3Y Return (CAGR)": "30.1%", "5Y Return (CAGR)": "32.4%", "Expense Ratio": "0.68%", "Risk": "വളരെ ഉയർന്ന റിസ്ക് (Very High)"},
-            {"Fund Name": "Motilal Oswal Midcap Fund", "3Y Return (CAGR)": "36.8%", "5Y Return (CAGR)": "29.2%", "Expense Ratio": "0.65%", "Risk": "ഉയർന്ന റിസ്ക് (High)"}
+            {"Fund Name": "Quant Small Cap Fund", "3Y CAGR": "34.2%", "5Y CAGR": "38.5%", "Expense Ratio": "0.77%", "Risk": "വളരെ ഉയർന്ന റിസ്ക്", "Why Invest?": "അൽഗോരിതം മോഡൽ ഉപയോഗിച്ച് വിപണിയിലെ ട്രെൻഡുകൾ അതിവേഗം പിടിച്ചെടുക്കുന്നു."},
+            {"Fund Name": "Nippon India Small Cap Fund", "3Y CAGR": "30.1%", "5Y CAGR": "32.4%", "Expense Ratio": "0.68%", "Risk": "ഉയർന്ന റിസ്ക്", "Why Invest?": "ഇന്ത്യയിലെ ഏറ്റവും വലിയ സ്മോൾ ക്യാപ് ഫണ്ട്, മികച്ച ഡൈവേഴ്സിഫിക്കേഷൻ."}
         ]
         st.dataframe(pd.DataFrame(funds), use_container_width=True, hide_index=True)
 
     st.markdown("---")
-    # 🧮 SIP കാൽക്കുലേറ്റർ
     st.subheader("🧮 ദീർഘകാല SIP കാൽക്കുലേറ്റർ (Compounding Power)")
     col_s1, col_s2, col_s3 = st.columns(3)
     sip_amount = col_s1.number_input("പ്രതിമാസ SIP തുക (₹):", value=5000, step=1000)
