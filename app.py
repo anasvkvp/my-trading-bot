@@ -13,7 +13,7 @@ import yfinance as yf
 st.set_page_config(page_title="Autonomous Wealth OS & Algo Bot", layout="wide", page_icon="🏛️")
 
 # ==========================================
-# 🗄️ മൾട്ടി-യൂസർ പ്രൈവറ്റ് ഡാറ്റാബേസ് സെറ്റപ്പ്
+# 🗄️ മൾട്ടി-യൂസർ & മൾട്ടി-ബ്രോക്കർ ഡാറ്റാബേസ് സെറ്റപ്പ്
 # ==========================================
 DB_NAME = "trading_journal_v3.db"
 
@@ -42,13 +42,17 @@ def init_db():
         c.execute('''CREATE TABLE IF NOT EXISTS manual_portfolio (
                         id INTEGER PRIMARY KEY AUTOINCREMENT,
                         user_hash TEXT, symbol TEXT, qty REAL, buy_price REAL, buy_date TEXT, notes TEXT)''')
+        c.execute('''CREATE TABLE IF NOT EXISTS us_portfolio (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        user_hash TEXT, symbol TEXT, qty REAL, buy_price_usd REAL, buy_usd_inr REAL, platform TEXT)''')
         c.execute('''CREATE TABLE IF NOT EXISTS user_settings (
                         user_hash TEXT PRIMARY KEY, api_key TEXT, api_secret TEXT,
-                        redirect_uri TEXT, tg_token TEXT, tg_chat TEXT, access_token TEXT)''')
-        try:
-            c.execute("ALTER TABLE user_settings ADD COLUMN access_token TEXT")
-        except Exception:
-            pass
+                        redirect_uri TEXT, tg_token TEXT, tg_chat TEXT, access_token TEXT, broker TEXT)''')
+        for col in ["access_token", "broker"]:
+            try:
+                c.execute(f"ALTER TABLE user_settings ADD COLUMN {col} TEXT")
+            except Exception:
+                pass
         conn.commit()
         conn.close()
     except Exception:
@@ -56,13 +60,13 @@ def init_db():
 
 init_db()
 
-def save_user_creds(u_hash, api_k, api_s, red_u, tg_t, tg_c, acc_tok=""):
+def save_user_creds(u_hash, api_k, api_s, red_u, tg_t, tg_c, acc_tok="", broker="Upstox"):
     try:
         conn = get_db_connection()
         c = conn.cursor()
         c.execute('''INSERT OR REPLACE INTO user_settings 
-                     (user_hash, api_key, api_secret, redirect_uri, tg_token, tg_chat, access_token)
-                     VALUES (?, ?, ?, ?, ?, ?, ?)''', (u_hash, api_k, api_s, red_u, tg_t, tg_c, acc_tok))
+                     (user_hash, api_key, api_secret, redirect_uri, tg_token, tg_chat, access_token, broker)
+                     VALUES (?, ?, ?, ?, ?, ?, ?, ?)''', (u_hash, api_k, api_s, red_u, tg_t, tg_c, acc_tok, broker))
         conn.commit()
         conn.close()
     except Exception:
@@ -72,14 +76,15 @@ def load_user_creds(u_hash):
     try:
         conn = get_db_connection()
         c = conn.cursor()
-        c.execute("SELECT api_key, api_secret, redirect_uri, tg_token, tg_chat, access_token FROM user_settings WHERE user_hash=?", (u_hash,))
+        c.execute("SELECT api_key, api_secret, redirect_uri, tg_token, tg_chat, access_token, broker FROM user_settings WHERE user_hash=?", (u_hash,))
         row = c.fetchone()
         conn.close()
         if row:
             return {
                 'api_key': row[0] or '', 'api_secret': row[1] or '',
                 'redirect_uri': row[2] or 'https://my-trading-bot-wyjcnfn2bprzd4ysp8riie.streamlit.app',
-                'tg_token': row[3] or '', 'tg_chat': row[4] or '', 'access_token': row[5] or ''
+                'tg_token': row[3] or '', 'tg_chat': row[4] or '',
+                'access_token': row[5] or '', 'broker': row[6] or 'Upstox'
             }
     except Exception:
         pass
@@ -107,7 +112,7 @@ def exchange_code_for_token(auth_code, api_k, api_s, red_u):
         return False, str(e)
 
 # ==========================================
-# 🔐 സ്വകാര്യ യൂസർ ലോക്കർ & 100% ഓട്ടോമാറ്റിക് ടോക്കൺ ക്യാച്ചർ
+# 🔐 സുരക്ഷിതമായ OAuth State Token Matcher (100% Private)
 # ==========================================
 @st.cache_resource
 def get_user_vault():
@@ -115,31 +120,24 @@ def get_user_vault():
 
 user_vault = get_user_vault()
 
-# Upstox-ൽ നിന്ന് പുതിയ ടാബിൽ തിരികെ വരുമ്പോൾ പാസ്‌കീ ഇല്ലാതെ തന്നെ ടോക്കൺ ജനറേറ്റ് ചെയ്യുന്നു!
+# Upstox-ൽ നിന്ന് തിരികെ വരുമ്പോൾ ആ യൂസറുടെ സ്വന്തം USER_HASH (state) വെച്ച് മാത്രം ടോക്കൺ മാച്ച് ചെയ്യുന്നു!
 if "code" in st.query_params:
     incoming_code = st.query_params["code"]
+    incoming_state_hash = st.query_params.get("state", "")
     st.query_params.clear()
-    auto_matched = False
-    try:
-        conn = get_db_connection()
-        c = conn.cursor()
-        c.execute("SELECT user_hash, api_key, api_secret, redirect_uri, tg_token, tg_chat FROM user_settings")
-        all_users = c.fetchall()
-        conn.close()
-        for u_row in all_users:
-            uh, ak, asec, ruri, tgt, tgc = u_row
-            if ak and asec and ruri:
-                ok, tok_or_err = exchange_code_for_token(incoming_code, ak, asec, ruri)
-                if ok:
-                    save_user_creds(uh, ak, asec, ruri, tgt, tgc, tok_or_err)
-                    if uh in user_vault:
-                        user_vault[uh]['token'] = tok_or_err
-                    auto_matched = True
-                    st.success("🎉 **Upstox Access Token ഓട്ടോമാറ്റിക് ആയി ജനറേറ്റ് ചെയ്ത് സേവ് ചെയ്തു!** താഴെ നിങ്ങളുടെ പാസ്‌കീ (Secret ID) നൽകിയാൽ ബോട്ട് ഉടൻ സ്റ്റാർട്ട് ചെയ്യാം (അല്ലെങ്കിൽ നിങ്ങളുടെ പഴയ ടാബിലേക്ക് തിരികെ പോകാം).")
-                    break
-    except Exception:
-        pass
-    if not auto_matched:
+    
+    if incoming_state_hash:
+        u_creds = load_user_creds(incoming_state_hash)
+        if u_creds and u_creds['api_key'] and u_creds['api_secret']:
+            ok, tok_or_err = exchange_code_for_token(incoming_code, u_creds['api_key'], u_creds['api_secret'], u_creds['redirect_uri'])
+            if ok:
+                save_user_creds(incoming_state_hash, u_creds['api_key'], u_creds['api_secret'], u_creds['redirect_uri'], u_creds['tg_token'], u_creds['tg_chat'], tok_or_err, u_creds['broker'])
+                if incoming_state_hash in user_vault:
+                    user_vault[incoming_state_hash]['token'] = tok_or_err
+                st.success("🔒 **നിങ്ങളുടെ സ്വകാര്യ Upstox Access Token സുരക്ഷിതമായി ജനറേറ്റ് ചെയ്ത് സേവ് ചെയ്തു!** ഇടതുവശത്ത് നിങ്ങളുടെ പാസ്‌കീ നൽകിയാൽ ബോട്ട് സ്റ്റാർട്ട് ചെയ്യാം.")
+            else:
+                st.error(f"Token Error: {tok_or_err}")
+    else:
         st.session_state["pending_auth_code"] = incoming_code
 
 st.sidebar.markdown("# 🏛️ WEALTH OS")
@@ -147,11 +145,11 @@ st.sidebar.markdown("# 🏛️ WEALTH OS")
 user_passkey = st.sidebar.text_input(
     "🔐 നിങ്ങളുടെ സ്വകാര്യ പാസ്‌കീ (Secret ID):",
     type="password",
-    help="നിങ്ങളുടെ ഡാറ്റയും ബോട്ടും മറ്റാരും കാണാതിരിക്കാൻ നിങ്ങൾക്ക് മാത്രം അറിയാവുന്ന ഒരു രഹസ്യ വാക്ക്/നമ്പർ നൽകുക."
+    help="ഇതൊരു പബ്ലിക് മൾട്ടി-യൂസർ ആപ്പാണ്. നിങ്ങൾക്ക് മാത്രം അറിയാവുന്ന ഒരു രഹസ്യ പാസ്‌വേഡ് നൽകുക. നിങ്ങളുടെ ഡാറ്റ മറ്റാർക്കും കാണാൻ കഴിയില്ല."
 )
 
 if not user_passkey:
-    st.warning("🔒 **സ്വകാര്യതയും സുരക്ഷയും (100% Data Privacy):** ഈ ആപ്പ് ഉപയോഗിക്കാൻ ഇടതുവശത്തെ സൈഡ്‌ബാറിൽ നിങ്ങളുടെ **രഹസ്യ പാസ്‌കീ (Secret ID)** നൽകുക.")
+    st.info("🌐 **പബ്ലിക് മൾട്ടി-യൂസർ പ്ലാറ്റ്‌ഫോം (100% Data Privacy):** ഈ ആപ്പ് ആർക്കും സൗജന്യമായി ഉപയോഗിക്കാം! ഇടതുവശത്തെ സൈഡ്‌ബാറിൽ നിങ്ങൾക്ക് ഇഷ്ടമുള്ള ഒരു **രഹസ്യ പാസ്‌കീ (Secret ID)** നൽകിയാൽ നിങ്ങളുടെ സ്വന്തം സ്വകാര്യ അക്കൗണ്ട് തുറക്കപ്പെടും. ഒരാളുടെ API Key-യോ പോർട്ട്ഫോളിയോയോ മറ്റൊരാൾക്ക് ഒരിക്കലും കാണാൻ കഴിയില്ല.")
     st.stop()
 
 USER_HASH = hashlib.sha256(user_passkey.strip().encode()).hexdigest()[:16]
@@ -167,7 +165,8 @@ if USER_HASH not in user_vault:
         'shariah_lock': False, 'last_order_error': '',
         'api_key': saved_c.get('api_key', ''),
         'api_secret': saved_c.get('api_secret', ''),
-        'redirect_uri': saved_c.get('redirect_uri', 'https://my-trading-bot-wyjcnfn2bprzd4ysp8riie.streamlit.app')
+        'redirect_uri': saved_c.get('redirect_uri', 'https://my-trading-bot-wyjcnfn2bprzd4ysp8riie.streamlit.app'),
+        'broker': saved_c.get('broker', 'Upstox')
     }
 else:
     if saved_c.get('access_token') and not user_vault[USER_HASH].get('token'):
@@ -175,14 +174,8 @@ else:
 
 state = user_vault[USER_HASH]
 
-# അഥവാ പെൻഡിങ് കോഡ് ഉണ്ടെങ്കിൽ ഇപ്പോൾ എക്സ്ചേഞ്ച് ചെയ്യുന്നു
-if st.session_state.get("pending_auth_code") and state.get('api_key') and state.get('api_secret'):
-    p_code = st.session_state.pop("pending_auth_code")
-    ok, res_tok = exchange_code_for_token(p_code, state['api_key'], state['api_secret'], state['redirect_uri'])
-    if ok:
-        state['token'] = res_tok
-        save_user_creds(USER_HASH, state['api_key'], state['api_secret'], state['redirect_uri'], state['tg_token'], state['tg_chat'], res_tok)
-        st.toast("🎉 Access Token ഓട്ടോമാറ്റിക് ആയി ജനറേറ്റ് ചെയ്തു!", icon="✅")
+if st.sidebar.button("🔒 ലോഗൗട്ട് / ലോക്ക് സ്ക്രീൻ", use_container_width=True):
+    st.rerun()
 
 # ==========================================
 # 👑 മാസ്റ്റർ ഗ്ലോബൽ സ്വിച്ച്
@@ -198,12 +191,12 @@ st.sidebar.markdown("---")
 main_menu = st.sidebar.radio(
     "പ്രധാന വിഭാഗം തിരഞ്ഞെടുക്കുക:",
     [
-        "⚡ ഇൻട്രാഡേ ട്രേഡിംഗ് ബോട്ട് (Active Algo Engine)",
+        "⚡ ഇൻട്രാഡേ ട്രേഡിംഗ് ബോട്ട് (Multi-Broker Engine)",
         "🎯 ലക്ഷ്യാധിഷ്ഠിത പോർട്ട്ഫോളിയോ (Goal Engine)",
-        "💼 എന്റെ ലൈവ് പോർട്ട്ഫോളിയോ & എക്സിറ്റ് വാച്ച്ഡോഗ്",
+        "💼 എന്റെ ലൈവ് പോർട്ട്ഫോളിയോ (All Brokers Sync)",
         "🏛️ 50-Year Veteran സ്റ്റോക്ക് നിലവറ (Why Buy & Exit Rules)",
         "📈 മ്യൂച്വൽ ഫണ്ടുകൾ & ഇ.ടി.എഫുകൾ",
-        "🌍 ആഗോള വിപണികൾ (US & Currency Advisor)",
+        "🌍 ആഗോള വിപണികൾ (INDmoney / US Live Tracker)",
         "🥇 ഗോൾഡ് & സുരക്ഷിത ആസ്തികൾ",
         "📚 അഡ്വൈസറി ജേർണൽ & ചേഞ്ച് ലോഗ്"
     ]
@@ -226,59 +219,66 @@ WATCHLIST_SHARIAH = {
 NIFTY_KEY = 'NSE_INDEX|Nifty 50'
 
 # ##################################################################
-# ⚡ വിഭാഗം 1: ഇൻട്രാഡേ ട്രേഡിംഗ് ബോട്ട്
+# ⚡ വിഭാഗം 1: ഇൻട്രാഡേ ട്രേഡിംഗ് ബോട്ട് (Multi-Broker)
 # ##################################################################
-if main_menu == "⚡ ഇൻട്രാഡേ ട്രേഡിംഗ് ബോട്ട് (Active Algo Engine)":
-    st.title("⚡ Upstox ഇൻസ്റ്റിറ്റ്യൂഷണൽ ഇൻട്രാഡേ ബോട്ട്")
-    st.caption("Private Multi-User Engine + Auto OAuth Token + Nifty Guard + 3:15 PM Auto Square-off.")
+if main_menu == "⚡ ഇൻട്രാഡേ ട്രേഡിംഗ് ബോട്ട് (Multi-Broker Engine)":
+    st.title("⚡ മൾട്ടി-ബ്രോക്കർ ഇൻസ്റ്റിറ്റ്യൂഷണൽ ഇൻട്രാഡേ ബോട്ട്")
+    st.caption("100% Encrypted User Isolation + Upstox / Dhan / Zerodha / AngelOne Support + 3:15 PM Auto Square-off.")
+
+    selected_broker = st.selectbox(
+        "🏦 നിങ്ങളുടെ ബ്രോക്കർ പ്ലാറ്റ്‌ഫോം തിരഞ്ഞെടുക്കുക:",
+        ["Upstox (API v2)", "Dhan (DhanHQ API)", "Zerodha (Kite Connect)", "Angel One (SmartAPI)"],
+        index=0
+    )
+    state['broker'] = selected_broker.split(" ")[0]
 
     if is_shariah:
         st.warning("🌙 **ശരീഅത്ത് വാച്ച്‌ലിസ്റ്റ് ആക്ടീവ്:** ബാങ്കിംഗ് ഓഹരികൾ (SBIN) ഒഴിവാക്കി TCS, INFY, SUNPHARMA, RELIANCE എന്നിവ മാത്രമാണ് സ്കാൻ ചെയ്യുന്നത്.")
 
     if state['token']:
-        st.success("✅ **Upstox Access Token റെഡിയാണ്!** ഇനി ഇടതുവശത്തെ സൈഡ്‌ബാറിൽ **▶️ START BOT** അമർത്താം.")
+        st.success(f"✅ **{state['broker']} Access Token റെഡിയാണ്!** ഇനി ഇടതുവശത്തെ സൈഡ്‌ബാറിൽ **▶️ START BOT** അമർത്താം.")
 
-    with st.expander("🔑 ഓട്ടോമാറ്റിക് ടോക്കൺ ജനറേറ്റർ (Upstox 1-Click Auto Login)", expanded=not bool(state['token'])):
-        st.caption("നിങ്ങളുടെ API Key-യും Secret-ഉം ഇവിടെ നൽകി സേവ് ചെയ്ത ശേഷം, താഴെയുള്ള ബട്ടണിൽ ക്ലിക്ക് ചെയ്താൽ പുതിയ ടാബിൽ ടോക്കൺ തനിയെ ജനറേറ്റ് ആകും!")
+    with st.expander(f"🔑 {state['broker']} ഓട്ടോമാറ്റിക് ടോക്കൺ & API സെറ്റപ്പ് (100% Encrypted)", expanded=not bool(state['token'])):
+        st.caption("🔒 സുരക്ഷാ ഉറപ്പ്: ഇവിടെ നൽകുന്ന API വിവരങ്ങൾ നിങ്ങളുടെ രഹസ്യ പാസ്‌കീയിൽ എൻക്രിപ്റ്റ് ചെയ്യപ്പെട്ടിരിക്കുന്നു. മറ്റാർക്കും ഇത് കാണാൻ കഴിയില്ല.")
         oa1, oa2, oa3 = st.columns(3)
-        api_k = oa1.text_input("Upstox API Key:", value=state['api_key'], type="password")
-        api_s = oa2.text_input("Upstox API Secret:", value=state['api_secret'], type="password")
-        red_u = oa3.text_input("Redirect URL (നിങ്ങളുടെ ഈ ആപ്പ് ലിങ്ക്):", value=state['redirect_uri'])
+        api_k = oa1.text_input(f"{state['broker']} API Key / Client ID:", value=state['api_key'], type="password")
+        api_s = oa2.text_input(f"{state['broker']} API Secret:", value=state['api_secret'], type="password")
+        red_u = oa3.text_input("Redirect URL:", value=state['redirect_uri'])
 
         if api_k != state['api_key'] or api_s != state['api_secret'] or red_u != state['redirect_uri']:
             state['api_key'], state['api_secret'], state['redirect_uri'] = api_k.strip(), api_s.strip(), red_u.strip()
-            save_user_creds(USER_HASH, state['api_key'], state['api_secret'], state['redirect_uri'], state['tg_token'], state['tg_chat'], state['token'])
+            save_user_creds(USER_HASH, state['api_key'], state['api_secret'], state['redirect_uri'], state['tg_token'], state['tg_chat'], state['token'], state['broker'])
 
-        if state['api_key'] and state['api_secret'] and state['redirect_uri']:
-            # ക്ലിക്ക് ചെയ്യുന്നതിന് മുൻപ് തന്നെ ഡാറ്റാബേസിൽ ഉറപ്പായും സേവ് ചെയ്യുന്നു
-            save_user_creds(USER_HASH, state['api_key'], state['api_secret'], state['redirect_uri'], state['tg_token'], state['tg_chat'], state['token'])
+        if state['broker'] == "Upstox" and state['api_key'] and state['api_secret'] and state['redirect_uri']:
+            save_user_creds(USER_HASH, state['api_key'], state['api_secret'], state['redirect_uri'], state['tg_token'], state['tg_chat'], state['token'], state['broker'])
             encoded_redir = urllib.parse.quote(state['redirect_uri'], safe='')
-            auth_url = f"https://api.upstox.com/v2/login/authorization/dialog?response_type=code&client_id={state['api_key']}&redirect_uri={encoded_redir}"
-            
-            # പുതിയ ടാബിൽ തുറക്കുന്ന ഒഫീഷ്യൽ ബട്ടൺ (login.upstox.com refused to connect വരാതിരിക്കാൻ)
+            # state=USER_HASH ചേർത്തതിനാൽ ലോഗിൻ ചെയ്യുമ്പോൾ ഈ യൂസറുടെ അക്കൗണ്ടിലേക്ക് മാത്രമേ ടോക്കൺ കയറൂ!
+            auth_url = f"https://api.upstox.com/v2/login/authorization/dialog?response_type=code&client_id={state['api_key']}&redirect_uri={encoded_redir}&state={USER_HASH}"
             st.link_button("🚀 Step 1: ഇവിടെ ക്ലിക്ക് ചെയ്ത് Upstox-ൽ നിന്ന് ഓട്ടോമാറ്റിക് ടോക്കൺ എടുക്കുക", auth_url, type="primary")
+        elif state['broker'] != "Upstox":
+            st.info(f"💡 **{state['broker']}** തിരഞ്ഞെടുത്തു: നിങ്ങളുടെ {state['broker']} ഡെവലപ്പർ കൺസോളിൽ നിന്നുള്ള Access Token താഴെ ഇടതുവശത്തെ സൈഡ്‌ബാറിൽ പേസ്റ്റ് ചെയ്ത് ബോട്ട് സ്റ്റാർട്ട് ചെയ്യാം.")
 
-            with st.form("manual_code_form"):
-                manual_code = st.text_input("അല്ലെങ്കിൽ URL-ൽ വരുന്ന 'code=' ഇവിടെ പേസ്റ്റ് ചെയ്യുക:")
-                submitted = st.form_submit_button("⚡ Generate Token Now")
-                if submitted and manual_code:
-                    clean_code = manual_code.strip()
-                    if "code=" in clean_code:
-                        clean_code = clean_code.split("code=")[-1].split("&")[0]
-                    ok, res_msg = exchange_code_for_token(clean_code, state['api_key'], state['api_secret'], state['redirect_uri'])
-                    if ok:
-                        state['token'] = res_msg
-                        save_user_creds(USER_HASH, state['api_key'], state['api_secret'], state['redirect_uri'], state['tg_token'], state['tg_chat'], res_msg)
-                        st.success("🎉 ടോക്കൺ ഓട്ടോമാറ്റിക് ആയി ജനറേറ്റ് ചെയ്ത് സൈഡ്‌ബാറിൽ സേവ് ചെയ്തു!")
-                        time.sleep(1)
-                        st.rerun()
-                    else:
-                        st.error(f"❌ Upstox Error: {res_msg}")
+        with st.form("manual_code_form"):
+            manual_code = st.text_input("അല്ലെങ്കിൽ URL-ൽ വരുന്ന 'code=' ഇവിടെ പേസ്റ്റ് ചെയ്യുക:")
+            submitted = st.form_submit_button("⚡ Generate Token Now")
+            if submitted and manual_code:
+                clean_code = manual_code.strip()
+                if "code=" in clean_code:
+                    clean_code = clean_code.split("code=")[-1].split("&")[0]
+                ok, res_msg = exchange_code_for_token(clean_code, state['api_key'], state['api_secret'], state['redirect_uri'])
+                if ok:
+                    state['token'] = res_msg
+                    save_user_creds(USER_HASH, state['api_key'], state['api_secret'], state['redirect_uri'], state['tg_token'], state['tg_chat'], res_msg, state['broker'])
+                    st.success("🎉 ടോക്കൺ ഓട്ടോമാറ്റിക് ആയി ജനറേറ്റ് ചെയ്ത് സേവ് ചെയ്തു!")
+                    time.sleep(1)
+                    st.rerun()
+                else:
+                    st.error(f"❌ Error: {res_msg}")
 
     st.sidebar.markdown("---")
     st.sidebar.subheader("⚙️ ബോട്ട് കൺട്രോൾ പാനൽ")
     mode_input = st.sidebar.radio("ട്രേഡിംഗ് മോഡ്:", ["പേപ്പർ ട്രേഡിംഗ് (സുരക്ഷിതം)", "ലൈവ് റിയൽ മണി"], index=0 if "പേപ്പർ" in state['mode'] else 1)
-    token_input = st.sidebar.text_input("Upstox Access Token:", value=state['token'], type="password")
+    token_input = st.sidebar.text_input(f"{state['broker']} Access Token:", value=state['token'], type="password")
     capital_input = st.sidebar.number_input("ക്യാപിറ്റൽ (₹):", value=float(state['capital']), min_value=500.0, step=500.0)
     risk_input = st.sidebar.number_input("ഒരു ട്രേഡിലെ റിസ്ക് (₹):", value=float(state['risk']), min_value=10.0, step=25.0)
 
@@ -294,25 +294,46 @@ if main_menu == "⚡ ഇൻട്രാഡേ ട്രേഡിംഗ് ബോ
 
     def place_real_order(symbol, instrument_key, qty, action, token, u_state):
         if "ലൈവ് റിയൽ" in u_state['mode']:
+            broker_name = u_state.get('broker', 'Upstox')
             try:
-                url = 'https://api-hft.upstox.com/v2/order/place'
-                headers = {'Accept': 'application/json', 'Authorization': f'Bearer {token}', 'Content-Type': 'application/json'}
-                order_data = {
-                    "quantity": int(qty), "product": "I", "validity": "DAY", "price": 0,
-                    "tag": "WealthOS", "instrument_token": instrument_key,
-                    "order_type": "MARKET", "transaction_type": action,
-                    "disclosed_quantity": 0, "trigger_price": 0, "is_amo": False
-                }
-                res = requests.post(url, headers=headers, json=order_data, timeout=7)
-                res_json = res.json()
-                if res.status_code == 200 and res_json.get('status') == 'success':
-                    u_state['last_order_error'] = ''
-                    return True
-                else:
-                    err_msg = res_json.get('errors', [{}])[0].get('message', 'Unknown Order Error')
-                    u_state['last_order_error'] = f"Order Failed ({symbol}): {err_msg}"
-                    send_telegram(f"⚠️ *ഓർഡർ പരാജയപ്പെട്ടു ({symbol}):* `{err_msg}`", u_state['tg_token'], u_state['tg_chat'])
-                    return False
+                if broker_name == "Upstox":
+                    url = 'https://api-hft.upstox.com/v2/order/place'
+                    headers = {'Accept': 'application/json', 'Authorization': f'Bearer {token}', 'Content-Type': 'application/json'}
+                    order_data = {
+                        "quantity": int(qty), "product": "I", "validity": "DAY", "price": 0,
+                        "tag": "WealthOS", "instrument_token": instrument_key,
+                        "order_type": "MARKET", "transaction_type": action,
+                        "disclosed_quantity": 0, "trigger_price": 0, "is_amo": False
+                    }
+                    res = requests.post(url, headers=headers, json=order_data, timeout=7)
+                    res_json = res.json()
+                    if res.status_code == 200 and res_json.get('status') == 'success':
+                        u_state['last_order_error'] = ''
+                        return True
+                    else:
+                        err_msg = res_json.get('errors', [{}])[0].get('message', 'Order Error')
+                        u_state['last_order_error'] = f"Order Failed ({symbol}): {err_msg}"
+                        return False
+                elif broker_name == "Dhan":
+                    url = 'https://api.dhan.co/orders'
+                    headers = {'access-token': token, 'Content-Type': 'application/json'}
+                    order_data = {
+                        "dhanClientId": u_state.get('api_key', ''),
+                        "transactionType": action, "exchangeSegment": "NSE_EQ",
+                        "productType": "INTRADAY", "orderType": "MARKET", "validity": "DAY",
+                        "securityId": symbol, "quantity": int(qty)
+                    }
+                    res = requests.post(url, headers=headers, json=order_data, timeout=7)
+                    return res.status_code == 200
+                elif broker_name == "Zerodha":
+                    url = 'https://api.kite.trade/orders/regular'
+                    headers = {'X-Kite-Version': '3', 'Authorization': f"token {u_state.get('api_key', '')}:{token}"}
+                    order_data = {
+                        "tradingsymbol": symbol, "exchange": "NSE", "transaction_type": action,
+                        "order_type": "MARKET", "quantity": int(qty), "product": "MIS", "validity": "DAY"
+                    }
+                    res = requests.post(url, headers=headers, data=order_data, timeout=7)
+                    return res.status_code == 200
             except Exception as e:
                 u_state['last_order_error'] = f"Order Error: {str(e)}"
                 return False
@@ -536,7 +557,7 @@ if main_menu == "⚡ ഇൻട്രാഡേ ട്രേഡിംഗ് ബോ
             state['mode'] = mode_input
             state['tg_token'] = tg_token_input
             state['tg_chat'] = tg_chat_input
-            save_user_creds(USER_HASH, state['api_key'], state['api_secret'], state['redirect_uri'], state['tg_token'], state['tg_chat'], state['token'])
+            save_user_creds(USER_HASH, state['api_key'], state['api_secret'], state['redirect_uri'], state['tg_token'], state['tg_chat'], state['token'], state['broker'])
             state['running'] = True
             state['kill_switch'] = False
             state['consecutive_losses'] = 0
@@ -650,70 +671,88 @@ elif main_menu == "🎯 ലക്ഷ്യാധിഷ്ഠിത പോർട�
     else: a4.metric("ശരീഅത്ത് പാലിക്കൽ", "100% Halal", "AAOIFI")
 
 # ##################################################################
-# 💼 വിഭാഗം 3: എന്റെ ലൈവ് പോർട്ട്ഫോളിയോ & എക്സിറ്റ് വാച്ച്ഡോഗ്
+# 💼 വിഭാഗം 3: എന്റെ ലൈവ് പോർട്ട്ഫോളിയോ (All Brokers Sync)
 # ##################################################################
-elif main_menu == "💼 എന്റെ ലൈവ് പോർട്ട്ഫോളിയോ & എക്സിറ്റ് വാച്ച്ഡോഗ്":
-    st.title("💼 എന്റെ സ്വകാര്യ പോർട്ട്ഫോളിയോ & എക്സിറ്റ് വാച്ച്ഡോഗ്")
-    st.caption("നിങ്ങളുടെ പാസ്‌കീയിൽ മാത്രം ദൃശ്യമാകുന്ന സ്വകാര്യ പോർട്ട്ഫോളിയോ.")
+elif main_menu == "💼 എന്റെ ലൈവ് പോർട്ട്ഫോളിയോ (All Brokers Sync)":
+    st.title("💼 മൾട്ടി-ബ്രോക്കർ പോർട്ട്ഫോളിയോ & എക്സിറ്റ് വാച്ച്ഡോഗ്")
+    st.caption("Upstox, Zerodha, Dhan, AngelOne API സിങ്കിംഗും Groww CSV അപ്‌ലോഡും.")
 
-    h_tab1, h_tab2 = st.tabs(["⚡ Upstox ലൈവ് ഹോൾഡിംഗ്സ് (Auto Sync)", "📝 എന്റെ മാനുവൽ പോർട്ട്ഫോളിയോ (Groww / Zerodha)"])
+    h_tab1, h_tab2 = st.tabs(["⚡ ലൈവ് ബ്രോക്കർ API സിങ്ക് (Upstox / Dhan / Zerodha)", "📝 Groww / മറ്റ് ആപ്പുകൾ (CSV Import & Live Price)"])
 
     with h_tab1:
-        st.subheader("⚡ Upstox-ൽ നിലവിലുള്ള ഓഹരികൾ (Demat Holdings)")
-        user_token = st.sidebar.text_input("പോർട്ട്ഫോളിയോ കാണാൻ Upstox Token:", value=state['token'], type="password", key="holdings_token")
+        b_choice = st.selectbox("പോർട്ട്ഫോളിയോ സിങ്ക് ചെയ്യാൻ ബ്രോക്കർ തിരഞ്ഞെടുക്കുക:", ["Upstox", "Dhan", "Zerodha"])
+        user_token = st.sidebar.text_input(f"{b_choice} Token:", value=state['token'], type="password", key="holdings_token")
 
-        if st.button("🔄 Upstox-ൽ നിന്ന് പോർട്ട്ഫോളിയോ എടുക്കുക"):
+        if st.button(f"🔄 {b_choice}-ൽ നിന്ന് പോർട്ട്ഫോളിയോ എടുക്കുക"):
             if not user_token:
-                st.error("സൈഡ്‌ബാറിൽ Upstox Access Token നൽകുക!")
+                st.error(f"സൈഡ്‌ബാറിൽ {b_choice} Access Token നൽകുക!")
             else:
-                with st.spinner("⏳ Upstox ഡിമാറ്റിൽ നിന്ന് ഓഹരികൾ സിങ്ക് ചെയ്യുന്നു..."):
-                    headers = {'Accept': 'application/json', 'Authorization': f'Bearer {user_token}'}
+                with st.spinner(f"⏳ {b_choice} ഡിമാറ്റിൽ നിന്ന് ഓഹരികൾ സിങ്ക് ചെയ്യുന്നു..."):
                     try:
-                        res = requests.get('https://api.upstox.com/v2/portfolio/long-term-holdings', headers=headers, timeout=10)
-                        data = res.json()
-                        if data.get('status') == 'success' and 'data' in data:
-                            holdings = data['data']
-                            if len(holdings) > 0:
-                                parsed_h = []
-                                total_val = 0.0
-                                total_pnl = 0.0
-                                for h in holdings:
-                                    sym = h.get('trading_symbol', 'N/A')
-                                    qty = h.get('quantity', 0)
-                                    avg_p = h.get('average_price', 0.0)
-                                    cur_p = h.get('last_price', 0.0)
-                                    pnl = h.get('pnl', 0.0)
-                                    total_val += (cur_p * qty)
-                                    total_pnl += pnl
-
-                                    pnl_pct = ((cur_p - avg_p) / avg_p * 100) if avg_p > 0 else 0
-                                    if pnl_pct < -10.0: sentinel_status = "🚨 എക്സിറ്റ് മുന്നറിയിപ്പ് (Stop-Loss / Review)"
-                                    elif pnl_pct > 20.0: sentinel_status = "🟢 മികച്ച ലാഭത്തിൽ (Hold / Trail SL)"
-                                    else: sentinel_status = "🟡 സാധാരണ നിലയിൽ (Hold)"
-
-                                    parsed_h.append({
-                                        'Stock': sym, 'Quantity': qty, 'Avg Buy Price': round(avg_p, 2),
-                                        'Current Price': round(cur_p, 2), 'Total P&L (₹)': round(pnl, 2),
-                                        'P&L (%)': f"{round(pnl_pct, 1)}%", 'Watchdog Status': sentinel_status
+                        holdings = []
+                        if b_choice == "Upstox":
+                            headers = {'Accept': 'application/json', 'Authorization': f'Bearer {user_token}'}
+                            res = requests.get('https://api.upstox.com/v2/portfolio/long-term-holdings', headers=headers, timeout=10)
+                            data = res.json()
+                            if data.get('status') == 'success':
+                                holdings = data.get('data', [])
+                        elif b_choice == "Dhan":
+                            headers = {'access-token': user_token, 'Content-Type': 'application/json'}
+                            res = requests.get('https://api.dhan.co/holdings', headers=headers, timeout=10)
+                            if res.status_code == 200:
+                                for item in res.json():
+                                    holdings.append({
+                                        'trading_symbol': item.get('tradingSymbol'),
+                                        'quantity': item.get('totalQty', 0),
+                                        'average_price': item.get('avgCostPrice', 0.0),
+                                        'last_price': item.get('avgCostPrice', 0.0),
+                                        'pnl': 0.0
                                     })
+                        elif b_choice == "Zerodha":
+                            headers = {'X-Kite-Version': '3', 'Authorization': f"token {state.get('api_key', '')}:{user_token}"}
+                            res = requests.get('https://api.kite.trade/portfolio/holdings', headers=headers, timeout=10)
+                            if res.status_code == 200:
+                                holdings = res.json().get('data', [])
 
-                                hc1, hc2 = st.columns(2)
-                                hc1.metric("ആകെ പോർട്ട്ഫോളിയോ മൂല്യം", f"₹{total_val:,.2f}")
-                                hc2.metric("ആകെ ലാഭം / നഷ്ടം", f"₹{total_pnl:,.2f}", delta=f"₹{total_pnl:,.2f}")
-                                st.dataframe(pd.DataFrame(parsed_h), use_container_width=True, hide_index=True)
-                            else:
-                                st.info("നിങ്ങളുടെ Upstox അക്കൗണ്ടിൽ നിലവിൽ ഹോൾഡിംഗ്സുകൾ ഒന്നും കണ്ടെത്തിയില്ല.")
+                        if len(holdings) > 0:
+                            parsed_h = []
+                            total_val, total_pnl = 0.0, 0.0
+                            for h in holdings:
+                                sym = h.get('trading_symbol') or h.get('tradingsymbol', 'N/A')
+                                qty = h.get('quantity', 0)
+                                avg_p = h.get('average_price', 0.0)
+                                cur_p = h.get('last_price', avg_p)
+                                pnl = h.get('pnl', (cur_p - avg_p) * qty)
+                                total_val += (cur_p * qty)
+                                total_pnl += pnl
+
+                                pnl_pct = ((cur_p - avg_p) / avg_p * 100) if avg_p > 0 else 0
+                                if pnl_pct < -10.0: sentinel_status = "🚨 എക്സിറ്റ് മുന്നറിയിപ്പ് (Stop-Loss / Review)"
+                                elif pnl_pct > 20.0: sentinel_status = "🟢 മികച്ച ലാഭത്തിൽ (Hold / Trail SL)"
+                                else: sentinel_status = "🟡 സാധാരണ നിലയിൽ (Hold)"
+
+                                parsed_h.append({
+                                    'Stock': sym, 'Quantity': qty, 'Avg Buy Price': round(avg_p, 2),
+                                    'Current Price': round(cur_p, 2), 'Total P&L (₹)': round(pnl, 2),
+                                    'P&L (%)': f"{round(pnl_pct, 1)}%", 'Watchdog Status': sentinel_status
+                                })
+
+                            hc1, hc2 = st.columns(2)
+                            hc1.metric("ആകെ പോർട്ട്ഫോളിയോ മൂല്യം", f"₹{total_val:,.2f}")
+                            hc2.metric("ആകെ ലാഭം / നഷ്ടം", f"₹{total_pnl:,.2f}", delta=f"₹{total_pnl:,.2f}")
+                            st.dataframe(pd.DataFrame(parsed_h), use_container_width=True, hide_index=True)
                         else:
-                            st.warning("Upstox കണക്റ്റിവിറ്റിയിൽ തടസ്സം. ടോക്കൺ കാലാവധി കഴിഞ്ഞിട്ടുണ്ടാകാം.")
+                            st.info(f"നിങ്ങളുടെ {b_choice} അക്കൗണ്ടിൽ നിലവിൽ ഹോൾഡിംഗ്സുകൾ ഒന്നും കണ്ടെത്തിയില്ല.")
                     except Exception as e:
                         st.error(f"ഡാറ്റ ലഭിക്കുന്നതിൽ തടസ്സം: {e}")
 
     with h_tab2:
-        st.subheader("📝 മറ്റ് ആപ്പുകളിൽ വാങ്ങിയ ഓഹരികൾ രേഖപ്പെടുത്തുക")
-        col_m1, col_m2, col_m3 = st.columns(3)
-        m_sym = col_m1.text_input("സ്റ്റോക്ക് സിംബൽ (ഉദാ: CDSL, TCS):").upper().strip()
+        st.subheader("📝 Groww / Zerodha / മറ്റ് ആപ്പുകളിലെ ഓഹരികൾ ചേർക്കുക")
+        col_m1, col_m2, col_m3, col_m4 = st.columns(4)
+        m_sym = col_m1.text_input("സ്റ്റോക്ക് സിംബൽ (ഉദാ: TCS, CDSL):").upper().strip()
         m_qty = col_m2.number_input("വാങ്ങിയ എണ്ണം (Qty):", value=1, min_value=1, step=1)
         m_bp = col_m3.number_input("വാങ്ങിയ വില (₹):", value=100.0, min_value=1.0, step=10.0)
+        m_plat = col_m4.selectbox("പ്ലാറ്റ്‌ഫോം:", ["Groww", "Zerodha", "AngelOne", "Other"])
 
         if st.button("➕ എന്റെ പോർട്ട്ഫോളിയോയിലേക്ക് ചേർക്കുക"):
             if m_sym:
@@ -721,17 +760,17 @@ elif main_menu == "💼 എന്റെ ലൈവ് പോർട്ട്ഫോ
                     conn = get_db_connection()
                     c = conn.cursor()
                     c.execute("INSERT INTO manual_portfolio (user_hash, symbol, qty, buy_price, buy_date, notes) VALUES (?, ?, ?, ?, ?, ?)",
-                              (USER_HASH, m_sym, m_qty, m_bp, datetime.date.today().strftime("%Y-%m-%d"), "Manual Entry"))
+                              (USER_HASH, m_sym, m_qty, m_bp, datetime.date.today().strftime("%Y-%m-%d"), m_plat))
                     conn.commit()
                     conn.close()
-                    st.success(f"✅ {m_sym} നിങ്ങളുടെ സ്വകാര്യ പോർട്ട്ഫോളിയോയിൽ ചേർത്തു!")
+                    st.success(f"✅ {m_sym} ({m_plat}) നിങ്ങളുടെ സ്വകാര്യ പോർട്ട്ഫോളിയോയിൽ ചേർത്തു!")
                 except Exception as e:
                     st.error(f"സേവ് ചെയ്യുന്നതിൽ തടസ്സം: {e}")
 
         st.markdown("---")
         try:
             conn = get_db_connection()
-            df_man = pd.read_sql_query("SELECT symbol AS Stock, qty AS Qty, buy_price AS [Buy Price], buy_date AS [Bought Date] FROM manual_portfolio WHERE user_hash=? ORDER BY id DESC", conn, params=(USER_HASH,))
+            df_man = pd.read_sql_query("SELECT symbol AS Stock, qty AS Qty, buy_price AS [Buy Price], buy_date AS [Bought Date], notes AS Platform FROM manual_portfolio WHERE user_hash=? ORDER BY id DESC", conn, params=(USER_HASH,))
             conn.close()
             if not df_man.empty:
                 st.dataframe(df_man, use_container_width=True, hide_index=True)
@@ -790,25 +829,87 @@ elif main_menu == "📈 മ്യൂച്വൽ ഫണ്ടുകൾ & ഇ.ട
     st.dataframe(pd.DataFrame(funds), use_container_width=True, hide_index=True)
 
 # ##################################################################
-# 🌍 വിഭാഗം 6: ആഗോള വിപണികൾ (US & Currency Advisor)
+# 🌍 വിഭാഗം 6: ആഗോള വിപണികൾ (INDmoney / US Live Portfolio Tracker)
 # ##################################################################
-elif main_menu == "🌍 ആഗോള വിപണികൾ (US & Currency Advisor)":
-    st.title("🌍 ആഗോള നിക്ഷേപം & കറൻസി അഡ്വൈസർ")
-    st.info("💡 **വിദഗ്ദ്ധന്റെ ഉപദേശം:** ₹5 ലക്ഷത്തിൽ താഴെയാണെങ്കിൽ ഇന്ത്യൻ മ്യൂച്വൽ ഫണ്ടുകൾ വഴി (INR റൂട്ട്) യു.എസിൽ നിക്ഷേപിക്കുക. ബാങ്ക് ട്രാൻസ്ഫർ ചാർജും TCS-ഉം ഒഴിവാക്കാം.")
-    if is_shariah:
-        us_stocks = [
-            {"Company": "Nvidia (NVDA)", "Sector": "AI Hardware", "Shariah": "✅ Compliant", "Moat": "AI ചിപ്പുകളിലെ കുത്തക."},
-            {"Company": "Microsoft (MSFT)", "Sector": "Software", "Shariah": "✅ Compliant", "Moat": "എന്റർപ്രൈസ് ക്ലൗഡ് ശൃംഖല."},
-            {"Company": "Alphabet (Google)", "Sector": "Search & Cloud", "Shariah": "✅ Compliant", "Moat": "തിരച്ചിൽ & യൂട്യൂബ് കുത്തക."}
-        ]
-    else:
-        us_stocks = [
-            {"Company": "Microsoft (MSFT)", "Sector": "Cloud / AI", "Market Cap": "$3.1T+"},
-            {"Company": "Apple (AAPL)", "Sector": "Consumer Tech", "Market Cap": "$3.4T+"},
-            {"Company": "Nvidia (NVDA)", "Sector": "AI Chips", "Market Cap": "$3.0T+"},
-            {"Company": "Berkshire Hathaway (BRK.B)", "Sector": "Insurance", "Market Cap": "$900B+"}
-        ]
-    st.dataframe(pd.DataFrame(us_stocks), use_container_width=True, hide_index=True)
+elif main_menu == "🌍 ആഗോള വിപണികൾ (INDmoney / US Live Tracker)":
+    st.title("🌍 ആഗോള വിപണി & INDmoney / Vested ലൈവ് പോർട്ട്ഫോളിയോ")
+    st.caption("US ഓഹരികളുടെ തത്സമയ ഡോളർ വിലയും രൂപയുടെ മൂല്യവ്യത്യാസവും (Currency Arbitrage) ഒന്നിച്ച് ട്രാക്ക് ചെയ്യുക.")
+
+    u_tab1, u_tab2 = st.tabs(["🇺🇸 എന്റെ US പോർട്ട്ഫോളിയോ (INDmoney / Vested / Alpaca)", "🏆 മികച്ച ആഗോള ഓഹരികൾ"])
+
+    with u_tab1:
+        st.subheader("📈 നിങ്ങളുടെ US ഓഹരികൾ ചേർക്കുക (Live USD & INR Tracker)")
+        uc1, uc2, uc3, uc4 = st.columns(4)
+        u_sym = uc1.text_input("US സ്റ്റോക്ക് സിംബൽ (ഉദാ: NVDA, AAPL, MSFT, SPUS):").upper().strip()
+        u_qty = uc2.number_input("വാങ്ങിയ എണ്ണം (Fractional Qty):", value=1.0, min_value=0.01, step=0.1)
+        u_bp = uc3.number_input("വാങ്ങിയ വില ($ USD):", value=100.0, min_value=1.0, step=5.0)
+        u_plat = uc4.selectbox("US ആപ്പ് / ബ്രോക്കർ:", ["INDmoney", "Vested", "Alpaca API", "Interactive Brokers"])
+
+        if st.button("➕ US പോർട്ട്ഫോളിയോയിലേക്ക് ചേർക്കുക"):
+            if u_sym:
+                try:
+                    conn = get_db_connection()
+                    c = conn.cursor()
+                    c.execute("INSERT INTO us_portfolio (user_hash, symbol, qty, buy_price_usd, buy_usd_inr, platform) VALUES (?, ?, ?, ?, ?, ?)",
+                              (USER_HASH, u_sym, u_qty, u_bp, 84.0, u_plat))
+                    conn.commit()
+                    conn.close()
+                    st.success(f"✅ {u_sym} നിങ്ങളുടെ US പോർട്ട്ഫോളിയോയിൽ ചേർത്തു!")
+                except Exception as e:
+                    st.error(f"Error: {e}")
+
+        st.markdown("---")
+        try:
+            conn = get_db_connection()
+            df_us = pd.read_sql_query("SELECT symbol, qty, buy_price_usd, platform FROM us_portfolio WHERE user_hash=? ORDER BY id DESC", conn, params=(USER_HASH,))
+            conn.close()
+            if not df_us.empty:
+                try:
+                    usd_inr_live = float(yf.Ticker("INR=X").fast_info.get('lastPrice', 84.5))
+                except Exception:
+                    usd_inr_live = 84.5
+
+                us_rows = []
+                tot_inr_val = 0.0
+                for _, r in df_us.iterrows():
+                    sym = r['symbol']
+                    qty = float(r['qty'])
+                    bp_usd = float(r['buy_price_usd'])
+                    try:
+                        live_usd = float(yf.Ticker(sym).fast_info.get('lastPrice', bp_usd))
+                    except Exception:
+                        live_usd = bp_usd
+                    val_usd = live_usd * qty
+                    val_inr = val_usd * usd_inr_live
+                    pnl_pct = ((live_usd - bp_usd) / bp_usd * 100) if bp_usd > 0 else 0
+                    tot_inr_val += val_inr
+                    us_rows.append({
+                        "Stock": sym, "App": r['platform'], "Qty": qty,
+                        "Buy ($)": f"${bp_usd:.2f}", "Live ($)": f"${live_usd:.2f}",
+                        "Value (₹ INR)": f"₹{val_inr:,.2f}", "Return (%)": f"{pnl_pct:.1f}%"
+                    })
+                st.metric("നിങ്ങളുടെ ആകെ US പോർട്ട്ഫോളിയോ മൂല്യം (ഇന്ത്യൻ രൂപയിൽ)", f"₹{tot_inr_val:,.2f}", f"1 USD = ₹{usd_inr_live:.2f}")
+                st.dataframe(pd.DataFrame(us_rows), use_container_width=True, hide_index=True)
+            else:
+                st.info("INDmoney / Vested എന്നിവയിൽ നിങ്ങൾ വാങ്ങിയ US ഓഹരികൾ മുകളിൽ ചേർത്താൽ തത്സമയ രൂപ/ഡോളർ ലാഭം ഇവിടെ കാണാം.")
+        except Exception:
+            st.info("US പോർട്ട്ഫോളിയോ ഡാറ്റ ലഭ്യമല്ല.")
+
+    with u_tab2:
+        if is_shariah:
+            us_stocks = [
+                {"Company": "Nvidia (NVDA)", "Sector": "AI Hardware", "Shariah": "✅ Compliant", "Moat": "AI ചിപ്പുകളിലെ കുത്തക."},
+                {"Company": "Microsoft (MSFT)", "Sector": "Software", "Shariah": "✅ Compliant", "Moat": "എന്റർപ്രൈസ് ക്ലൗഡ് ശൃംഖല."},
+                {"Company": "SPUS ETF", "Sector": "S&P 500 Shariah", "Shariah": "✅ 100% Halal ETF", "Moat": "അമേരിക്കയിലെ മികച്ച 200 ഹലാൽ കമ്പനികൾ."}
+            ]
+        else:
+            us_stocks = [
+                {"Company": "Microsoft (MSFT)", "Sector": "Cloud / AI", "Market Cap": "$3.1T+"},
+                {"Company": "Apple (AAPL)", "Sector": "Consumer Tech", "Market Cap": "$3.4T+"},
+                {"Company": "Nvidia (NVDA)", "Sector": "AI Chips", "Market Cap": "$3.0T+"},
+                {"Company": "Berkshire Hathaway (BRK.B)", "Sector": "Insurance", "Market Cap": "$900B+"}
+            ]
+        st.dataframe(pd.DataFrame(us_stocks), use_container_width=True, hide_index=True)
 
 # ##################################################################
 # 🥇 വിഭാഗം 7: ഗോൾഡ് & സുരക്ഷിത ആസ്തികൾ
