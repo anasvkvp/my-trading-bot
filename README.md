@@ -12,3 +12,9 @@ An institutional-grade, multi-asset wealth management and algorithmic execution 
 ---
 
 ## 🌟 Key Architectural Pillars
+┌─────────────────────────────────────────┐
+                                  │       Autonomous Wealth Engine          │
+                                  └────────────────────┬────────────────────┘
+                                                       │
+    ┌─────────────────────────┬────────────────────────┼────────────────────────┬─────────────────────────┐
+    ▼                         ▼                        ▼                        ▼                         ▼
