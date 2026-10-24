@@ -8,82 +8,266 @@ import threading
 import sqlite3
 import urllib.parse
 import hashlib
+import xml.etree.ElementTree as ET
 import yfinance as yf
 
 # ==========================================
-# 🌐 PAGE CONFIGURATION & MASTER STOCK DIRECTORY (FOR AUTO-COMPLETE)
+# 🌐 PAGE CONFIGURATION
 # ==========================================
-st.set_page_config(page_title="Autonomous Wealth OS & Financial Life Doctor", layout="wide", page_icon="🏛️")
+st.set_page_config(page_title="Autonomous Wealth OS & Live Market Scanner", layout="wide", page_icon="🏛️")
 
-# Popular NSE & Global Stocks Directory for Instant Auto-Complete Dropdowns (Type 'I' -> sees ITC, INFY, etc.)
-NSE_STOCK_DIRECTORY = [
-    "TCS - Tata Consultancy Services Ltd",
-    "INFY - Infosys Ltd",
-    "RELIANCE - Reliance Industries Ltd",
-    "POLYCAB - Polycab India Ltd",
-    "SUNPHARMA - Sun Pharmaceutical Industries",
-    "TATAELXSI - Tata Elxsi Ltd",
-    "TITAN - Titan Company Ltd",
-    "ITC - ITC Limited",
-    "SBIN - State Bank of India",
-    "HDFCBANK - HDFC Bank Ltd",
-    "ICICIBANK - ICICI Bank Ltd",
-    "BHARTIARTL - Bharti Airtel Ltd",
-    "LT - Larsen & Toubro Ltd",
-    "CDSL - Central Depository Services (India) Ltd",
-    "HAL - Hindustan Aeronautics Ltd",
-    "MARUTI - Maruti Suzuki India Ltd",
-    "M&M - Mahindra & Mahindra Ltd",
-    "TATAMOTORS - Tata Motors Ltd",
-    "WIPRO - Wipro Ltd",
-    "HCLTECH - HCL Technologies Ltd",
-    "ASIANPAINT - Asian Paints Ltd",
-    "PIDILITIND - Pidilite Industries Ltd",
-    "DMART - Avenue Supermarts Ltd (DMart)",
-    "NESTLEIND - Nestle India Ltd",
-    "HINDUNILVR - Hindustan Unilever Ltd",
-    "BAJFINANCE - Bajaj Finance Ltd",
-    "IRCTC - Indian Railway Catering & Tourism Corp",
-    "BEL - Bharat Electronics Ltd",
-    "COALINDIA - Coal India Ltd",
-    "NTPC - NTPC Ltd",
-    "POWERGRID - Power Grid Corporation of India",
-    "ULTRACEMCO - UltraTech Cement Ltd",
-    "DRREDDY - Dr. Reddy's Laboratories",
-    "CIPLA - Cipla Ltd",
-    "DIVISLAB - Divi's Laboratories Ltd",
-    "DIXON - Dixon Technologies (India) Ltd",
-    "KPITTECH - KPIT Technologies Ltd",
-    "PERSISTENT - Persistent Systems Ltd",
-    "COFORGE - Coforge Ltd",
-    "ASTRAL - Astral Ltd",
-    "SUPREMEIND - Supreme Industries Ltd",
-    "CUMMINSIND - Cummins India Ltd",
-    "ABB - ABB India Ltd",
-    "SIEMENS - Siemens Ltd",
-    "TRENT - Trent Ltd",
-    "ZOMATO - Zomato Ltd",
-    "JIOFIN - Jio Financial Services Ltd",
-    "GOLDBEES - Nippon India ETF Gold BeES",
-    "SILVERBEES - Nippon India Silver ETF",
-    "CUSTOM - ✍️ Type Any Other NSE Symbol Manually..."
-]
+# ==========================================
+# 🔎 LIVE GLOBAL STOCK & MUTUAL FUND SEARCH APIS (ALL NSE, BSE, US & AMFI)
+# ==========================================
+@st.cache_data(ttl=600)
+def live_search_yahoo_tickers(query_str, market_filter="ALL"):
+    """Searches Yahoo Finance live database for ANY NSE (.NS), BSE (.BO), or US stock."""
+    if not query_str or len(query_str.strip()) < 1:
+        return []
+    url = f"https://query2.finance.yahoo.com/v1/finance/search?q={urllib.parse.quote(query_str.strip())}&quotesCount=25&newsCount=0"
+    headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}
+    results = []
+    try:
+        res = requests.get(url, headers=headers, timeout=6)
+        if res.status_code == 200:
+            quotes = res.json().get("quotes", [])
+            for q in quotes:
+                sym = q.get("symbol", "")
+                name = q.get("longname") or q.get("shortname") or sym
+                exch = q.get("exchDisp") or q.get("exchange") or ""
+                qtype = q.get("quoteType", "")
+                if qtype not in ["EQUITY", "ETF", "INDEX"]:
+                    continue
+                if market_filter == "INDIA" and not (sym.endswith(".NS") or sym.endswith(".BO")):
+                    continue
+                if market_filter == "US" and (sym.endswith(".NS") or sym.endswith(".BO")):
+                    continue
+                results.append(f"{sym} | {name} ({exch})")
+    except Exception:
+        pass
+    return results
 
-US_STOCK_DIRECTORY = [
-    "NVDA - Nvidia Corporation",
-    "MSFT - Microsoft Corporation",
-    "AAPL - Apple Inc.",
-    "GOOGL - Alphabet Inc. (Google)",
-    "AMZN - Amazon.com Inc.",
-    "META - Meta Platforms Inc.",
-    "TSLA - Tesla Inc.",
-    "BRK-B - Berkshire Hathaway Inc.",
-    "SPUS - SP Funds S&P 500 Sharia Industry Exclusions ETF",
-    "HLAL - Wahed FTSE USA Shariah ETF",
-    "QQQ - Invesco QQQ Trust (Nasdaq-100)",
-    "VOO - Vanguard S&P 500 ETF",
-    "CUSTOM - ✍️ Type Any Other US Ticker Manually..."
-]
+@st.cache_data(ttl=900)
+def analyze_any_stock_deep(ticker_sym):
+    """Performs a complete institutional Pros, Cons, Shariah & Horizon (1Y/5Y/10Y) audit on ANY stock."""
+    tk = yf.Ticker(ticker_sym)
+    info = tk.info or {}
+    hist = tk.history(period="5y")
+    if hist.empty:
+        hist = tk.history(period="1y")
+
+    if hist.empty and not info.get("regularMarketPrice") and not info.get("currentPrice"):
+        return None
+
+    curr_p = info.get("currentPrice") or info.get("regularMarketPrice") or (float(hist['Close'].iloc[-1]) if not hist.empty else 0.0)
+    comp_name = info.get("longName") or info.get("shortName") or ticker_sym
+    sector = info.get("sector") or "Diversified / ETF"
+    industry = info.get("industry") or sector
+    currency = info.get("currency", "INR")
+    curr_sym = "₹" if currency == "INR" else "$"
+
+    mcap = info.get("marketCap") or 0
+    tot_debt = info.get("totalDebt") or 0
+    tot_cash = info.get("totalCash") or 0
+    rev_growth = (info.get("revenueGrowth") or 0) * 100
+    earn_growth = (info.get("earningsGrowth") or 0) * 100
+    op_margin = (info.get("operatingMargins") or 0) * 100
+    prof_margin = (info.get("profitMargins") or 0) * 100
+    pe_ratio = info.get("trailingPE") or info.get("forwardPE") or 0
+    pb_ratio = info.get("priceToBook") or 0
+    div_yield = (info.get("dividendYield") or 0) * 100
+
+    # Robust ROE calculation with fallback
+    raw_roe = info.get("returnOnEquity")
+    if raw_roe is not None:
+        roe = raw_roe * 100
+    else:
+        net_inc = info.get("netIncomeToCommon") or 0
+        bv = info.get("bookValue") or 0
+        sh = info.get("sharesOutstanding") or 0
+        roe = (net_inc / (bv * sh) * 100) if (bv * sh) > 0 else prof_margin
+
+    debt_to_mcap = (tot_debt / mcap * 100) if mcap > 0 else 0.0
+    cash_to_mcap = (tot_cash / mcap * 100) if mcap > 0 else 0.0
+
+    # Price Returns & Technical Trend (200 DMA)
+    ret_1y, ret_5y, above_200dma = 0.0, 0.0, True
+    if not hist.empty:
+        closes = hist['Close']
+        if len(closes) >= 200:
+            dma200 = closes.rolling(200).mean().iloc[-1]
+            above_200dma = curr_p >= dma200
+        if len(closes) >= 252:
+            ret_1y = ((curr_p - float(closes.iloc[-252])) / float(closes.iloc[-252])) * 100
+        else:
+            ret_1y = ((curr_p - float(closes.iloc[0])) / float(closes.iloc[0])) * 100
+        ret_5y = ((curr_p - float(closes.iloc[0])) / float(closes.iloc[0])) * 100
+
+    # AAOIFI Shariah Check
+    non_halal_kw = ["Bank", "Financial", "Insurance", "Tobacco", "Cigarette", "Brew", "Distill", "Alcohol", "Casino", "Gambling", "Defense", "Pork"]
+    is_prohibited_sec = any(k.lower() in (sector + " " + industry + " " + comp_name).lower() for k in non_halal_kw)
+    shariah_pass = (not is_prohibited_sec) and (debt_to_mcap < 33.0)
+
+    # Pros & Cons Generation
+    pros, cons = [], []
+    if roe >= 15:
+        pros.append(f"ഉയർന്ന മൂലധന ലാഭക്ഷമത (Strong ROE: {roe:.1f}% >= 15%)")
+    else:
+        cons.append(f"കുറഞ്ഞ ലാഭക്ഷമത (Low ROE: {roe:.1f}% < 15%)")
+
+    if debt_to_mcap < 15:
+        pros.append(f"വളരെ കുറഞ്ഞ കടബാധ്യത (Low Debt/MCap: {debt_to_mcap:.1f}%)")
+    elif debt_to_mcap >= 33:
+        cons.append(f"അമിതമായ കടബാധ്യത (High Debt/MCap: {debt_to_mcap:.1f}% >= 33%)")
+
+    if op_margin >= 15:
+        pros.append(f"മികച്ച ഓപ്പറേറ്റിംഗ് മാർജിൻ (Operating Margin: {op_margin:.1f}%)")
+    elif op_margin < 8 and op_margin != 0:
+        cons.append(f"കുറഞ്ഞ ഓപ്പറേറ്റിംഗ് മാർജിൻ ({op_margin:.1f}%)")
+
+    if rev_growth > 10:
+        pros.append(f"മികച്ച വരുമാന വളർച്ച (Revenue Growth: +{rev_growth:.1f}% YoY)")
+    elif rev_growth < 0:
+        cons.append(f"വരുമാനത്തിൽ ഇടിവ് (Revenue Decline: {rev_growth:.1f}%)")
+
+    if 0 < pe_ratio <= 30:
+        pros.append(f"ന്യായമായ വില നിലവാരം (Reasonable P/E: {pe_ratio:.1f}x)")
+    elif pe_ratio > 60:
+        cons.append(f"അമിത വില നിലവാരം (Expensive Valuation P/E: {pe_ratio:.1f}x)")
+
+    if above_200dma:
+        pros.append("200-Day Moving Average-ന് മുകളിൽ ശക്തമായ അപ്-ട്രെൻഡിലാണ്")
+    else:
+        cons.append("200-Day Moving Average-ന് താഴെ ബെയറിഷ് ട്രെൻഡിലാണ്")
+
+    # Horizon Suitability (1Y / 3-5Y / 10+Y)
+    suit_1y = "✅ അനുയോജ്യം (Bullish Trend & Momentum)" if (above_200dma and ret_1y > 5 and pe_ratio < 65) else "⚠️ ജാഗ്രത പാലിക്കുക (High Volatility / Weak Trend)"
+    suit_5y = "✅ മികച്ചത് (Strong Growth & Margin)" if (roe >= 14 and debt_to_mcap < 33 and rev_growth >= 5) else "⚠️ ശരാശരി (Needs Fundamental Improvement)"
+    suit_10y = "🏛️ 10+ വർഷത്തേക്ക് മികച്ച Moat Compounder!" if (roe >= 18 and debt_to_mcap < 20 and op_margin >= 15) else "❌ 10 വർഷത്തേക്ക് അനുയോജ്യമല്ല (Not a Moat Monopoly)"
+
+    overall_score = 0
+    if roe >= 15: overall_score += 30
+    if debt_to_mcap < 25: overall_score += 25
+    if op_margin >= 15: overall_score += 20
+    if above_200dma: overall_score += 15
+    if 0 < pe_ratio <= 40: overall_score += 10
+
+    if overall_score >= 75:
+        verdict = "🟢 STRONG BUY / ACCUMULATE (നിക്ഷേപത്തിന് ഏറ്റവും അനുയോജ്യം)"
+    elif overall_score >= 50:
+        verdict = "🟡 HOLD / WATCHLIST (തകർച്ചയിൽ വാങ്ങാം / നിരീക്ഷിക്കുക)"
+    else:
+        verdict = "🔴 AVOID / HIGH RISK (ഒഴിവാക്കുക - ഫണ്ടമെന്റൽ പോരായ്മകൾ)"
+
+    return {
+        "symbol": ticker_sym, "name": comp_name, "price": curr_p, "curr_sym": curr_sym,
+        "sector": sector, "industry": industry, "roe": roe, "op_margin": op_margin,
+        "debt_to_mcap": debt_to_mcap, "cash_to_mcap": cash_to_mcap, "pe": pe_ratio,
+        "div_yield": div_yield, "ret_1y": ret_1y, "ret_5y": ret_5y,
+        "shariah_pass": shariah_pass, "is_prohibited_sec": is_prohibited_sec,
+        "pros": pros, "cons": cons, "suit_1y": suit_1y, "suit_5y": suit_5y, "suit_10y": suit_10y,
+        "score": overall_score, "verdict": verdict, "hist": hist
+    }
+
+@st.cache_data(ttl=1800)
+def fetch_live_ipos_india():
+    """Fetches real-time Open & Upcoming Indian IPO news & listings from NSE/Google Finance RSS."""
+    ipo_items = []
+    headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}
+    # 1. Try NSE Live Upcoming/Active IPO API
+    try:
+        s = requests.Session()
+        s.get("https://www.nseindia.com", headers=headers, timeout=5)
+        r = s.get("https://www.nseindia.com/api/ipo-current-issue", headers=headers, timeout=6)
+        if r.status_code == 200:
+            for item in r.json():
+                ipo_items.append({
+                    "IPO Company": item.get("companyName", "N/A"),
+                    "Symbol": item.get("symbol", ""),
+                    "Status": "🟢 OPEN NOW (NSE Live)",
+                    "Dates": f"{item.get('issueStartDate', '')} to {item.get('issueEndDate', '')}",
+                    "Price Band": f"₹{item.get('issuePrice', 'TBA')}",
+                    "Category": item.get("series", "Mainboard / SME")
+                })
+    except Exception:
+        pass
+
+    # 2. Fetch Live Upcoming & Open IPO Updates via Google News RSS (Always works 24/7 on Cloud)
+    try:
+        rss_url = "https://news.google.com/rss/search?q=IPO+GMP+price+band+subscription+India+when:7d&hl=en-IN&gl=IN&ceid=IN:en"
+        r_rss = requests.get(rss_url, headers=headers, timeout=6)
+        if r_rss.status_code == 200:
+            root = ET.fromstring(r_rss.content)
+            for item in root.findall(".//item")[:15]:
+                title = item.find("title").text if item.find("title") is not None else ""
+                pub = item.find("pubDate").text[:16] if item.find("pubDate") is not None else ""
+                status_tag = "🟢 OPEN / GMP UPDATE" if ("open" in title.lower() or "gmp" in title.lower() or "subscri" in title.lower()) else "⏳ UPCOMING / NEWS"
+                ipo_items.append({
+                    "IPO Company": title.split(" - ")[0],
+                    "Symbol": "LIVE FEED",
+                    "Status": status_tag,
+                    "Dates": pub,
+                    "Price Band": "Check Analyzer Below",
+                    "Category": title.split(" - ")[-1] if " - " in title else "IPO Desk"
+                })
+    except Exception:
+        pass
+    return ipo_items
+
+@st.cache_data(ttl=1800)
+def search_live_mutual_funds(query_str):
+    """Searches all 10,000+ Indian Mutual Funds live via AMFI API (mfapi.in)."""
+    if not query_str or len(query_str.strip()) < 2:
+        return []
+    try:
+        res = requests.get(f"https://api.mfapi.in/mf/search?q={urllib.parse.quote(query_str.strip())}", timeout=8)
+        if res.status_code == 200:
+            return res.json()[:25]
+    except Exception:
+        pass
+    return []
+
+@st.cache_data(ttl=1800)
+def analyze_mutual_fund_scheme(scheme_code):
+    """Calculates live 1Y, 3Y, and 5Y CAGR for any Mutual Fund scheme from AMFI historical NAV."""
+    try:
+        res = requests.get(f"https://api.mfapi.in/mf/{scheme_code}", timeout=8)
+        if res.status_code == 200:
+            data = res.json()
+            meta = data.get("meta", {})
+            nav_list = data.get("data", [])
+            if not nav_list:
+                return None
+            curr_nav = float(nav_list[0]["nav"])
+            curr_date = nav_list[0]["date"]
+
+            def get_cagr(days_ago, years):
+                idx = min(len(nav_list) - 1, int(days_ago * 0.68))
+                for item in nav_list:
+                    try:
+                        d_obj = datetime.datetime.strptime(item["date"], "%d-%m-%Y")
+                        if (datetime.datetime.now() - d_obj).days >= days_ago:
+                            old_nav = float(item["nav"])
+                            if old_nav > 0:
+                                return (((curr_nav / old_nav) ** (1.0 / years)) - 1.0) * 100
+                            break
+                    except Exception:
+                        continue
+                return 0.0
+
+            cagr_1y = get_cagr(365, 1.0)
+            cagr_3y = get_cagr(1095, 3.0)
+            cagr_5y = get_cagr(1825, 5.0)
+            return {
+                "name": meta.get("scheme_name", ""),
+                "house": meta.get("fund_house", ""),
+                "category": meta.get("scheme_category", ""),
+                "nav": curr_nav, "date": curr_date,
+                "cagr_1y": cagr_1y, "cagr_3y": cagr_3y, "cagr_5y": cagr_5y
+            }
+    except Exception:
+        pass
+    return None
 
 # ==========================================
 # 🗄️ MULTI-USER SQLITE DATABASE SETUP (WAL MODE)
@@ -189,29 +373,7 @@ def exchange_code_for_token(auth_code, api_k, api_s, red_u):
         return False, str(e)
 
 # ==========================================
-# 🌐 MULTILINGUAL UI LABELS
-# ==========================================
-st.sidebar.markdown("# 🏛️ WEALTH OS")
-lang = st.sidebar.selectbox("🌐 Language / ഭാഷ:", ["മലയാളം", "English", "हिन्दी", "العربية"], index=0)
-is_ml = (lang == "മലയാളം")
-
-MENU_ITEMS = [
-    "🧭 തുടക്കക്കാരുടെ വഴികാട്ടി (Start Here Guide)" if is_ml else "🧭 Beginner Quick-Start Guide",
-    "💳 കടം തീർക്കൽ & ലോൺ പ്ലാനർ (Debt Freedom)" if is_ml else "💳 Debt Freedom & Loan Elimination Planner",
-    "🎯 ലക്ഷ്യാധിഷ്ഠിത പോർട്ട്ഫോളിയോ (Goal Engine)" if is_ml else "🎯 Dynamic Goal Allocator",
-    "🏛️ 50-Year സ്റ്റോക്ക് നിലവറ & ലൈവ് സ്കാനർ" if is_ml else "🏛️ 50-Year Moat Vault & Live Scanner",
-    "💼 എന്റെ ലൈവ് പോർട്ട്ഫോളിയോ & വാച്ച്ഡോഗ്" if is_ml else "💼 Live Portfolio & Exit Watchdog",
-    "🎟️ ഐ.പി.ഒ (IPO) റഡാർ & അനലൈസർ" if is_ml else "🎟️ IPO Radar & Red-Flag Analyzer",
-    "📜 ബോണ്ടുകൾ, കടപ്പത്രങ്ങൾ & സുരക്ഷിത വരുമാനം" if is_ml else "📜 Bonds, G-Secs & Halal Fixed-Income",
-    "📈 മ്യൂച്വൽ ഫണ്ടുകൾ & ഇ.ടി.എഫുകൾ" if is_ml else "📈 Mutual Funds & ETFs",
-    "🌍 ആഗോള വിപണികൾ (US & INDmoney)" if is_ml else "🌍 Global Markets (US & Currency)",
-    "🥇 ഗോൾഡ് & സുരക്ഷിത ആസ്തികൾ" if is_ml else "🥇 Gold & Crisis Hedge Assets",
-    "⚡ ഇൻട്രാഡേ ട്രേഡിംഗ് ബോട്ട് (Algo Engine)" if is_ml else "⚡ Intraday Algo Trading Bot",
-    "📚 അഡ്വൈസറി ജേർണൽ & ചേഞ്ച് ലോഗ്" if is_ml else "📚 Investment Audit Journal"
-]
-
-# ==========================================
-# 🔐 OAUTH STATE MATCHER & SESSION AUTHENTICATION
+# 🌐 SIDEBAR & AUTHENTICATION
 # ==========================================
 @st.cache_resource
 def get_user_vault():
@@ -219,11 +381,14 @@ def get_user_vault():
 
 user_vault = get_user_vault()
 
+st.sidebar.markdown("# 🏛️ WEALTH OS")
+lang = st.sidebar.selectbox("🌐 Language / ഭാഷ:", ["മലയാളം", "English"], index=0)
+is_ml = (lang == "മലയാളം")
+
 if "code" in st.query_params:
     incoming_code = st.query_params["code"]
     incoming_state_hash = st.query_params.get("state", "")
     st.query_params.clear()
-    
     if incoming_state_hash:
         u_creds = load_user_creds(incoming_state_hash)
         if u_creds and u_creds['api_key'] and u_creds['api_secret']:
@@ -233,18 +398,14 @@ if "code" in st.query_params:
                 if incoming_state_hash in user_vault:
                     user_vault[incoming_state_hash]['token'] = tok_or_err
                 st.session_state["authenticated_user_hash"] = incoming_state_hash
-                st.success("🎉 OAuth 2.0 Access Token generated and securely saved to your vault!")
-            else:
-                st.error(f"OAuth Token Error: {tok_or_err}")
-    else:
-        st.session_state["pending_auth_code"] = incoming_code
+                st.success("🎉 Access Token ഓട്ടോമാറ്റിക് ആയി ജനറേറ്റ് ചെയ്തു!")
 
 if "authenticated_user_hash" not in st.session_state:
     st.session_state["authenticated_user_hash"] = None
 
 if not st.session_state["authenticated_user_hash"]:
     st.subheader("🔒 സ്വകാര്യ ലോക്കർ ലോഗിൻ (100% Data Privacy)" if is_ml else "🔒 Private Vault Login (100% Data Privacy)")
-    st.info("നിങ്ങളുടെ സ്വകാര്യ അക്കൗണ്ട് തുറക്കാൻ നിങ്ങൾക്ക് മാത്രം അറിയാവുന്ന ഒരു രഹസ്യ പാസ്‌കീ (Secret ID) നൽകുക. നിങ്ങളുടെ കടവിവരങ്ങളോ പോർട്ട്ഫോളിയോയോ മറ്റാർക്കും കാണാൻ കഴിയില്ല." if is_ml else "Enter your personal Secret Passkey to unlock your isolated workspace. No other user can view your data.")
+    st.info("നിങ്ങളുടെ സ്വകാര്യ അക്കൗണ്ട് തുറക്കാൻ നിങ്ങൾക്ക് മാത്രം അറിയാവുന്ന ഒരു രഹസ്യ പാസ്‌കീ (Secret ID) നൽകുക." if is_ml else "Enter your personal Secret Passkey to unlock your isolated workspace.")
     with st.form("vault_login_form"):
         passkey_input = st.text_input("നിങ്ങളുടെ രഹസ്യ പാസ്‌കീ (Secret ID) നൽകുക:" if is_ml else "Enter Secret Passkey / ID:", type="password")
         login_submitted = st.form_submit_button("🔓 അക്കൗണ്ട് തുറക്കുക (Login)" if is_ml else "🔓 Unlock Workspace", type="primary")
@@ -260,432 +421,413 @@ if st.sidebar.button("🔒 ലോഗൗട്ട് / സ്ക്രീൻ പ�
     st.rerun()
 
 saved_c = load_user_creds(USER_HASH) or {}
-
 if USER_HASH not in user_vault:
     user_vault[USER_HASH] = {
         'running': False, 'token': saved_c.get('access_token', ''), 'capital': 5000.0, 'risk': 100.0,
-        'mode': 'PAPER',
-        'tg_token': saved_c.get('tg_token', ''), 'tg_chat': saved_c.get('tg_chat', ''),
+        'mode': 'PAPER', 'tg_token': saved_c.get('tg_token', ''), 'tg_chat': saved_c.get('tg_chat', ''),
         'thread': None, 'consecutive_losses': 0, 'kill_switch': False,
-        'nifty_status': 'Checking...', 'active_pos': None,
-        'shariah_lock': False, 'last_order_error': '',
-        'api_key': saved_c.get('api_key', ''),
-        'api_secret': saved_c.get('api_secret', ''),
+        'nifty_status': 'Checking...', 'active_pos': None, 'shariah_lock': False, 'last_order_error': '',
+        'api_key': saved_c.get('api_key', ''), 'api_secret': saved_c.get('api_secret', ''),
         'redirect_uri': saved_c.get('redirect_uri', 'https://my-trading-bot-wyjcnfn2bprzd4ysp8riie.streamlit.app'),
         'broker': saved_c.get('broker', 'Upstox')
     }
-else:
-    if saved_c.get('access_token') and not user_vault[USER_HASH].get('token'):
-        user_vault[USER_HASH]['token'] = saved_c['access_token']
-
 state = user_vault[USER_HASH]
 
-# ==========================================
-# 👑 MASTER PHILOSOPHY & NAVIGATION MENU
-# ==========================================
 st.sidebar.markdown("---")
 phil_options = ["🌐 ആഗോള ജനറൽ മോഡ് (Conventional)", "🌙 100% പ്യുവർ ശരീഅത്ത് മോഡ് (Halal AAOIFI)"] if is_ml else ["🌐 Global Conventional Mode", "🌙 100% Pure Shariah Mode (AAOIFI)"]
 wealth_mode = st.sidebar.radio("നിക്ഷേപ തത്ത്വശാസ്ത്രം:" if is_ml else "Investment Philosophy:", phil_options)
 is_shariah = ("ശരീഅത്ത്" in wealth_mode or "Shariah" in wealth_mode)
 state['shariah_lock'] = is_shariah
 
+MENU_ITEMS = [
+    "🧭 തുടക്കക്കാരുടെ വഴികാട്ടി (Start Here)" if is_ml else "🧭 Beginner Quick-Start Guide",
+    "🔎 ഏത് സ്റ്റോക്കും പരിശോധിക്കാം (NSE/BSE/US Live Scanner)" if is_ml else "🔎 Universal Stock Scanner & Screener (NSE/BSE/US)",
+    "🎟️ ലൈവ് ഐ.പി.ഒ (IPO) റഡാർ & അനലൈസർ" if is_ml else "🎟️ Live IPO Radar (Open & Upcoming)",
+    "📈 മ്യൂച്വൽ ഫണ്ട് ലൈവ് സ്ക്രീനർ (All 10,000+ Funds)" if is_ml else "📈 Live Mutual Fund Screener (All AMFI Funds)",
+    "💳 കടം തീർക്കൽ & ലോൺ പ്ലാനർ (Debt Freedom)" if is_ml else "💳 Debt Freedom & Loan Elimination Planner",
+    "🎯 ലക്ഷ്യാധിഷ്ഠിത പോർട്ട്ഫോളിയോ (Goal Engine)" if is_ml else "🎯 Dynamic Goal Allocator",
+    "💼 എന്റെ ലൈവ് പോർട്ട്ഫോളിയോ (All Brokers)" if is_ml else "💼 Live Portfolio & Exit Watchdog",
+    "🌍 ആഗോള വിപണികൾ (US Live Screener & INDmoney)" if is_ml else "🌍 Global Markets (US Screener & Portfolio)",
+    "📜 ബോണ്ടുകൾ, കടപ്പത്രങ്ങൾ & ഹലാൽ വരുമാനം" if is_ml else "📜 Bonds, G-Secs & Halal Fixed-Income",
+    "🥇 ഗോൾഡ് & സുരക്ഷിത ആസ്തികൾ" if is_ml else "🥇 Gold & Crisis Hedge Assets",
+    "⚡ ഇൻട്രാഡേ ട്രേഡിംഗ് ബോട്ട് (Algo Engine)" if is_ml else "⚡ Intraday Algo Trading Bot",
+    "📚 അഡ്വൈസറി ജേർണൽ" if is_ml else "📚 Investment Audit Journal"
+]
+
 st.sidebar.markdown("---")
 main_menu = st.sidebar.radio("പ്രധാന വിഭാഗം തിരഞ്ഞെടുക്കുക:" if is_ml else "Select Core Module:", MENU_ITEMS)
 
-# Helper function for Auto-Complete Stock Selection
-def select_stock_autocomplete(label_text, directory_list, key_prefix, default_index=0):
-    choice = st.selectbox(label_text, directory_list, index=default_index, key=f"{key_prefix}_sel")
-    if choice.startswith("CUSTOM"):
-        custom_val = st.text_input("✍️ സ്റ്റോക്ക് സിംബൽ ടൈപ്പ് ചെയ്യുക (ഉദാ: FEDERALBNK, IDEA):" if is_ml else "✍️ Enter Custom Symbol:", key=f"{key_prefix}_cust").upper().strip()
-        return custom_val
-    return choice.split(" - ")[0].strip()
-
-WATCHLIST_CONVENTIONAL = {
-    'SBIN': 'NSE_EQ|INE062A01020',
-    'RELIANCE': 'NSE_EQ|INE002A01018',
-    'BHARTIARTL': 'NSE_EQ|INE397D01024',
-    'LT': 'NSE_EQ|INE018A01030'
-}
-
-WATCHLIST_SHARIAH = {
-    'TCS': 'NSE_EQ|INE467B01029',
-    'INFY': 'NSE_EQ|INE009A01021',
-    'SUNPHARMA': 'NSE_EQ|INE044A01036',
-    'RELIANCE': 'NSE_EQ|INE002A01018'
-}
-
-NIFTY_KEY = 'NSE_INDEX|Nifty 50'
+# Helper UI component: Live Search Box that queries Yahoo Finance for ANY stock on Earth
+def render_universal_stock_search(key_prefix, market_filter="ALL", default_query="Polycab"):
+    c_s1, c_s2 = st.columns([2, 3])
+    q_input = c_s1.text_input(
+        "🔍 കമ്പനിയുടെ പേര് അല്ലെങ്കിൽ അക്ഷരങ്ങൾ ടൈപ്പ് ചെയ്യുക (ഉദാ: Kitex, Kalyan, Tata, Apple):" if is_ml else "🔍 Type Company Name or Letters (e.g. Kitex, Kalyan, Tata, Apple):",
+        value=default_query,
+        key=f"{key_prefix}_q"
+    )
+    matches = live_search_yahoo_tickers(q_input, market_filter=market_filter)
+    if matches:
+        sel = c_s2.selectbox(
+            f"✅ '{q_input}' എന്നതിൽ തുടങ്ങുന്ന കമ്പനികൾ (ഇതിൽ നിന്ന് തിരഞ്ഞെടുക്കുക):" if is_ml else f"✅ Matching Companies for '{q_input}':",
+            matches,
+            key=f"{key_prefix}_sel"
+        )
+        return sel.split(" | ")[0].strip()
+    else:
+        c_s2.warning("ഈ പേരിൽ കമ്പനികൾ കണ്ടില്ല. അക്ഷരങ്ങൾ മാറ്റി ടൈപ്പ് ചെയ്യുക.")
+        return q_input.upper().strip()
 
 # ##################################################################
-# 🧭 MODULE 0: BEGINNER QUICK-START GUIDE (USER-FRIENDLY ONBOARDING)
+# 🧭 MODULE 0: BEGINNER QUICK-START GUIDE
 # ##################################################################
 if main_menu == MENU_ITEMS[0]:
-    st.title("🧭 സ്വാഗതം! എവിടെ തുടങ്ങണം? (Beginner Financial Roadmap)" if is_ml else "🧭 Welcome! Step-by-Step Financial Life Roadmap")
-    st.caption("ഓഹരി വിപണിയോ സാമ്പത്തിക ആസൂത്രണമോ ഒട്ടും അറിയാത്തവർക്കും ഏറ്റവും എളുപ്പത്തിൽ ഉപയോഗിക്കാവുന്ന വഴികാട്ടി." if is_ml else "A zero-jargon guide for beginners to achieve debt freedom and generational wealth.")
-
-    st.success("👋 **ആദ്യമായിട്ടാണോ ഇവിടെ?** താഴെ കൊടുത്തിരിക്കുന്ന 4 ഘട്ടങ്ങൾ ക്രമമായി പിന്തുടരുക. ഇടതുവശത്തെ മെനുവിൽ ക്ലിക്ക് ചെയ്ത് ഓരോ വിഭാഗത്തിലേക്കും പോകാം!" if is_ml else "👋 **New here?** Follow the 4 steps below in order using the left sidebar menu!")
-
+    st.title("🧭 സ്വാഗതം! ഈ പ്ലാറ്റ്‌ഫോം എങ്ങനെ ഉപയോഗിക്കാം?" if is_ml else "🧭 Welcome! Step-by-Step Financial Life Roadmap")
+    st.success("👋 **ആദ്യമായിട്ടാണോ ഇവിടെ?** താഴെ കാണുന്ന 4 ഘട്ടങ്ങൾ വായിച്ചാൽ ഈ ആപ്പിലെ എല്ലാ സൗകര്യങ്ങളും ഒരു ബുദ്ധിമുട്ടുമില്ലാതെ നിങ്ങൾക്ക് ഉപയോഗിക്കാം!")
     g1, g2 = st.columns(2)
     with g1:
         st.markdown("""
-        ### 🛑 ഘട്ടം 1: നിങ്ങൾക്ക് കടങ്ങളോ ലോണുകളോ ഉണ്ടോ?
-        * **എന്ത് ചെയ്യണം?** ഇടതുവശത്തെ മെനുവിൽ **'💳 കടം തീർക്കൽ & ലോൺ പ്ലാനർ'** തിരഞ്ഞെടുക്കുക.
-        * **എന്തുകൊണ്ട്?** 14%–36% പലിശയുള്ള പേഴ്സണൽ ലോണും ക്രെഡിറ്റ് കാർഡ് കടവും വെച്ചുകൊണ്ട് സ്റ്റോക്ക് മാർക്കറ്റിൽ ട്രേഡ് ചെയ്യരുത്! ആദ്യം നിങ്ങളുടെ എല്ലാ കടങ്ങളും അവിടെ ലിസ്റ്റ് ചെയ്യുക. ഏത് കടമാണ് ആദ്യം വീട്ടേണ്ടതെന്നും EMI മുടങ്ങിയാൽ എങ്ങനെ പരിഹരിക്കാമെന്നും ആ സിസ്റ്റം പറഞ്ഞുതരും.
+        ### 1️⃣ ഏതൊരു സ്റ്റോക്കും (NSE / BSE / US) എങ്ങനെ പരിശോധിക്കാം?
+        * ഇടതുവശത്തെ മെനുവിൽ **'🔎 ഏത് സ്റ്റോക്കും പരിശോധിക്കാം'** എടുക്കുക.
+        * അവിടെയുള്ള സെർച്ച് ബോക്സിൽ നിങ്ങൾക്ക് അറിയേണ്ട ഏത് കമ്പനിയുടെയും പേര് (ഉദാഹരണത്തിന് `Kalyan`, `Kitex`, `Cochin`, `Reliance`, `Nvidia`) ടൈപ്പ് ചെയ്യുക.
+        * ഉടൻ തന്നെ വലതുവശത്തെ ബോക്സിൽ ആ പേരിലുള്ള എല്ലാ കമ്പനികളും ലിസ്റ്റ് ആയി വരും! അതിൽ ക്ലിക്ക് ചെയ്താൽ ആ സ്റ്റോക്കിൽ **ഇൻവെസ്റ്റ് ചെയ്യാമോ, 1 വർഷത്തേക്കാണോ 5 വർഷത്തേക്കാണോ നല്ലത്, അതിന്റെ ഗുണങ്ങളും ദോഷങ്ങളും എന്തൊക്കെയാണ്** എന്ന് തത്സമയം കാണാം!
         
-        ---
-        ### 🛡️ ഘട്ടം 2: അത്യാവശ്യ ഫണ്ടും (Emergency Fund) സ്വർണ്ണവും
-        * **എന്ത് ചെയ്യണം?** **'🎯 ലക്ഷ്യാധിഷ്ഠിത പോർട്ട്ഫോളിയോ'**, **'🥇 ഗോൾഡ് & സുരക്ഷിത ആസ്തികൾ'** എന്നിവ തുറക്കുക.
-        * **എന്തുകൊണ്ട്?** നിങ്ങളുടെ 3 മുതൽ 6 മാസത്തെ വീട്ടുചെലവിനുള്ള പണം സുരക്ഷിതമായി മാറ്റിവെക്കണം. അതിനുശേഷം മാത്രമേ ഓഹരി വിപണിയിലേക്ക് കടക്കാവൂ.
-        """ if is_ml else """
-        ### 🛑 Step 1: Do You Have High-Interest Debt or Loans?
-        * **Action:** Open **'💳 Debt Freedom & Loan Elimination Planner'** in the sidebar.
-        * **Why?** Never trade or invest while paying 14%–36% interest on personal loans or credit cards. List your debts there to generate a step-by-step payoff priority plan.
-        
-        ---
-        ### 🛡️ Step 2: Build Your Emergency Shield & Gold Hedge
-        * **Action:** Open **'🎯 Dynamic Goal Allocator'** and **'🥇 Gold & Crisis Hedge Assets'**.
-        * **Why?** Secure 3–6 months of living expenses in liquid reserves and physical gold ETFs before taking equity risk.
+        ### 2️⃣ കടങ്ങളും ലോണുകളും ഉള്ളവർ എവിടെ തുടങ്ങണം?
+        * **'💳 കടം തീർക്കൽ & ലോൺ പ്ലാനർ'** തുറന്ന് നിങ്ങളുടെ എല്ലാ ലോണുകളും ചേർക്കുക. ഏത് ലോൺ ആദ്യം അടക്കണമെന്ന് സിസ്റ്റം പ്ലാൻ ചെയ്തു തരും.
         """)
-
     with g2:
         st.markdown("""
-        ### 🏛️ ഘട്ടം 3: ദീർഘകാല നിക്ഷേപം (സ്റ്റോക്കുകൾ, മ്യൂച്വൽ ഫണ്ട്, IPO, ബോണ്ട്)
-        * **എന്ത് ചെയ്യണം?** **'🏛️ 50-Year സ്റ്റോക്ക് നിലവറ'**, **'📈 മ്യൂച്വൽ ഫണ്ടുകൾ'**, **'🎟️ ഐ.പി.ഒ റഡാർ'** എന്നിവ പരിശോധിക്കുക.
-        * **എന്തുകൊണ്ട്?** ഏതൊരു കമ്പനിയുടെയും പേര് ടൈപ്പ് ചെയ്യുമ്പോൾത്തന്നെ ഓട്ടോമാറ്റിക് ലിസ്റ്റിൽ നിന്ന് തിരഞ്ഞെടുത്ത് അതിന്റെ കടവും ലാഭവും ഹലാൽ സ്റ്റാറ്റസും ഒറ്റ ക്ലിക്കിൽ പരിശോധിക്കാം!
+        ### 3️⃣ നിലവിലുള്ളതും വരാൻ പോകുന്നതുമായ IPO-കളും മ്യൂച്വൽ ഫണ്ടുകളും
+        * **'🎟️ ലൈവ് ഐ.പി.ഒ റഡാർ'** തുറന്നാൽ ഇപ്പോൾ മാർക്കറ്റിൽ ഓപ്പൺ ആയിട്ടുള്ളതും ഇനി വരാൻ പോകുന്നതുമായ IPO-കളുടെ ലൈവ് ലിസ്റ്റും അവയുടെ ഗുണനിലവാരവും പരിശോധിക്കാം.
+        * **'📈 മ്യൂച്വൽ ഫണ്ട് ലൈവ് സ്ക്രീനർ'** വഴി ഇന്ത്യയിലെ 10,000+ മ്യൂച്വൽ ഫണ്ടുകളിൽ ഏതിന്റെയും പേര് അടിച്ച് 1Y, 3Y, 5Y ലാഭം പരിശോധിക്കാം!
         
-        ---
-        ### ⚡ ഘട്ടം 4: ഇൻട്രാഡേ ട്രേഡിംഗ് ബോട്ട് (പരിചയസമ്പന്നർക്ക് മാത്രം)
-        * **എന്ത് ചെയ്യണം?** **'⚡ ഇൻട്രാഡേ ട്രേഡിംഗ് ബോട്ട്'** തുറന്ന് ആദ്യം **'പേപ്പർ ട്രേഡിംഗ് (സുരക്ഷിതം)'** മോഡിൽ മാത്രം പ്രവർത്തിപ്പിച്ചു പഠിക്കുക.
-        * **എന്തുകൊണ്ട്?** യഥാർത്ഥ പണം നഷ്ടപ്പെടാതെ ലൈവ് മാർക്കറ്റിൽ ബോട്ട് എങ്ങനെ പ്രവർത്തിക്കുന്നു എന്ന് പഠിക്കാൻ പേപ്പർ ട്രേഡിംഗ് സഹായിക്കും.
-        """ if is_ml else """
-        ### 🏛️ Step 3: Long-Term Wealth (Moat Stocks, Mutual Funds, IPOs & Bonds)
-        * **Action:** Explore **'🏛️ 50-Year Moat Vault'**, **'📈 Mutual Funds'**, and **'🎟️ IPO Radar'**.
-        * **Why?** Use our Auto-Complete Stock Scanner to check any company's debt, ROE, and AAOIFI Shariah compliance in one click.
-        
-        ---
-        ### ⚡ Step 4: Intraday Algo Bot (Start with Paper Trading!)
-        * **Action:** Open **'⚡ Intraday Algo Trading Bot'** and keep it in **Paper Trading Mode**.
-        * **Why?** Test live market execution with zero financial risk before deploying real capital.
+        ### 4️⃣ ഓട്ടോമാറ്റിക് ലൈവ് മാർക്കറ്റ് സ്ക്രീനിംഗ് (Rescan Button)
+        * സ്റ്റോക്ക് സ്കാനറിലും US മാർക്കറ്റിലും **'🔄 മാർക്കറ്റ് ലൈവ് ആയി സ്ക്രീൻ ചെയ്യുക (Run Live Screener)'** എന്ന ബട്ടൺ അമർത്തിയാൽ കമ്പ്യൂട്ടർ തനിയെ മാർക്കറ്റ് പരിശോധിച്ച് മികച്ച സ്റ്റോക്കുകളെ കണ്ടെത്തി തരും!
         """)
 
 # ##################################################################
-# 💳 MODULE 1: DEBT FREEDOM & LOAN ELIMINATION PLANNER (NEW!)
+# 🔎 MODULE 1: UNIVERSAL STOCK SCANNER & LIVE SCREENER (NSE / BSE / US)
 # ##################################################################
 elif main_menu == MENU_ITEMS[1]:
-    st.title("💳 കടം തീർക്കൽ & സാമ്പത്തിക മോചന എൻജിൻ (Debt Freedom Planner)" if is_ml else "💳 Debt Freedom & Loan Elimination Planner")
-    st.caption("നിങ്ങളുടെ എല്ലാ ലോണുകളും കടങ്ങളും ഇവിടെ ലളിതമായി ലിസ്റ്റ് ചെയ്യുക. ഏത് കടമാണ് ആദ്യം വീട്ടേണ്ടതെന്നും, EMI മുടങ്ങിയാൽ എന്ത് ചെയ്യണമെന്നും കൃത്യമായി പ്ലാൻ ചെയ്യാം." if is_ml else "List all your loans and informal debts to calculate interest drain, payoff priority, and default recovery strategies.")
+    st.title("🔎 യൂണിവേഴ്സൽ സ്റ്റോക്ക് സ്കാനർ & ലൈവ് മാർക്കറ്റ് സ്ക്രീനർ (NSE / BSE / US)")
+    st.caption("ഇന്ത്യയിലെയും (NSE/BSE) അമേരിക്കയിലെയും (US) ഏതൊരു കമ്പനിയുടെയും പേര് ടൈപ്പ് ചെയ്ത് അതിന്റെ ഗുണങ്ങളും ദോഷങ്ങളും, 1Y / 5Y / 10Y അനുയോജ്യതയും തത്സമയം പരിശോധിക്കുക.")
 
-    with st.expander("➕ പുതിയ ലോൺ / കടം ചേർക്കുക (ഇവിടെ ക്ലിക്ക് ചെയ്യുക)" if is_ml else "➕ Add a Loan or Debt to Your Tracker", expanded=True):
+    tab_search, tab_screener = st.tabs([
+        "🔍 ഏത് കമ്പനിയും തിരഞ്ഞ് പരിശോധിക്കുക (Universal Stock Audit)",
+        "📡 ഓട്ടോമാറ്റിക് ലൈവ് മാർക്കറ്റ് സ്ക്രീനർ (Live Rescan & Filter)"
+    ])
+
+    with tab_search:
+        mkt_choice = st.radio("ഏത് മാർക്കറ്റാണ് പരിശോധിക്കേണ്ടത്?", ["🇮🇳 ഇന്ത്യൻ മാർക്കറ്റ് (NSE & BSE)", "🇺🇸 യു.എസ് മാർക്കറ്റ് (NASDAQ & NYSE)", "🌐 എല്ലാ മാർക്കറ്റുകളും (All Global)"], horizontal=True)
+        m_filt = "INDIA" if "ഇന്ത്യൻ" in mkt_choice else ("US" if "യു.എസ്" in mkt_choice else "ALL")
+        def_q = "Polycab" if m_filt != "US" else "Nvidia"
+
+        selected_sym = render_universal_stock_search("univ_scan", market_filter=m_filt, default_query=def_q)
+
+        if st.button("🔄 ഈ സ്റ്റോക്ക് ഇപ്പോൾ തത്സമയം റീ-സ്കാൻ ചെയ്യുക (Refresh Live Audit)", type="primary"):
+            st.cache_data.clear()
+
+        if selected_sym:
+            with st.spinner(f"⏳ `{selected_sym}`-ന്റെ പൂർണ്ണമായ ഫണ്ടമെന്റൽ, ടെക്നിക്കൽ, ശരീഅത്ത് വിവരങ്ങൾ പരിശോധിക്കുന്നു..."):
+                audit = analyze_any_stock_deep(selected_sym)
+                if not audit:
+                    st.error(f"❌ `{selected_sym}` എന്ന കമ്പനിയുടെ ഡാറ്റ ലഭ്യമല്ല. മുകളിലെ സെർച്ച് ബോക്സിൽ പേര് ടൈപ്പ് ചെയ്ത് വലതുവശത്തെ ലിസ്റ്റിൽ നിന്ന് തിരഞ്ഞെടുക്കുക.")
+                else:
+                    st.subheader(f"🏢 {audit['name']} (`{audit['symbol']}`) — നിലവിലെ വില: {audit['curr_sym']}{audit['price']:,.2f}")
+                    
+                    # Final Verdict Banner
+                    if "STRONG BUY" in audit['verdict']:
+                        st.success(f"### 🏆 അന്തിമ വിധി (Final Verdict): {audit['verdict']} (Score: {audit['score']}/100)")
+                    elif "HOLD" in audit['verdict']:
+                        st.warning(f"### ⚖️ അന്തിമ വിധി (Final Verdict): {audit['verdict']} (Score: {audit['score']}/100)")
+                    else:
+                        st.error(f"### 🛑 അന്തിമ വിധി (Final Verdict): {audit['verdict']} (Score: {audit['score']}/100)")
+
+                    # Key Metrics Row
+                    k1, k2, k3, k4, k5 = st.columns(5)
+                    k1.metric("സെക്ടർ (Sector)", audit['sector'])
+                    k2.metric("ലാഭക്ഷമത (ROE)", f"{audit['roe']:.1f}%", "✅ മികച്ചത്" if audit['roe'] >= 15 else "⚠️ കുറവ്")
+                    k3.metric("കടം (Debt / MCap)", f"{audit['debt_to_mcap']:.1f}%", "✅ സുരക്ഷിതം (<33%)" if audit['debt_to_mcap'] < 33 else "❌ അമിത കടം")
+                    k4.metric("P/E & ഓപ്പറേറ്റിംഗ് മാർജിൻ", f"PE: {audit['pe']:.1f}x", f"Margin: {audit['op_margin']:.1f}%")
+                    k5.metric("AAOIFI ശരീഅത്ത് സ്റ്റാറ്റസ്", "✅ ഹലാൽ (HALAL)" if audit['shariah_pass'] else "❌ നോൺ-ഹലാൽ", f"1Y Return: {audit['ret_1y']:+.1f}%")
+
+                    st.markdown("---")
+                    # Horizon Suitability (1 Year vs 3-5 Years vs 10+ Years)
+                    st.subheader("⏳ എത്ര കാലത്തേക്ക് നിക്ഷേപിക്കാൻ അനുയോജ്യമാണ്? (Time-Horizon Suitability)")
+                    h1, h2, h3 = st.columns(3)
+                    h1.info(f"**📅 1 വർഷത്തേക്ക് (Short-Term):**\n\n{audit['suit_1y']}")
+                    h2.info(f"**🚀 3 - 5 വർഷത്തേക്ക് (Medium-Term):**\n\n{audit['suit_5y']}")
+                    h3.info(f"**🏛️ 10+ വർഷത്തേക്ക് (Long-Term Moat):**\n\n{audit['suit_10y']}")
+
+                    # Pros & Cons Columns
+                    pc1, pc2 = st.columns(2)
+                    with pc1:
+                        st.success("#### 🟢 ഈ കമ്പനിയുടെ നല്ല കാര്യങ്ങൾ (Strengths / Pros)")
+                        if audit['pros']:
+                            for p in audit['pros']:
+                                st.markdown(f"- ✅ {p}")
+                        else:
+                            st.write("- കാര്യമായ പോസിറ്റീവ് സൂചകങ്ങൾ കാണുന്നില്ല.")
+                    with pc2:
+                        st.error("#### 🔴 ശ്രദ്ധിക്കേണ്ട പോരായ്മകൾ (Weaknesses / Red Flags)")
+                        if audit['cons']:
+                            for c_item in audit['cons']:
+                                st.markdown(f"- ⚠️ {c_item}")
+                        else:
+                            st.write("- ഫണ്ടമെന്റൽ പോരായ്മകൾ ഒന്നും കണ്ടെത്തിയില്ല!")
+
+                    if not audit['hist'].empty:
+                        st.caption(f"📈 **{audit['name']} — ലൈവ് പ്രൈസ് ചാർട്ട്:**")
+                        st.line_chart(audit['hist']['Close'])
+
+    with tab_screener:
+        st.subheader("📡 ഓട്ടോമാറ്റിക് ലൈവ് മാർക്കറ്റ് സ്ക്രീനർ (Live Market Auto-Screener)")
+        st.caption("നിങ്ങളുടെ മാനദണ്ഡങ്ങൾ (ROE, Debt, Shariah Mode) അനുസരിച്ച് മാർക്കറ്റിലെ സ്റ്റോക്കുകളെ ഇപ്പോൾത്തന്നെ തത്സമയം സ്കാൻ ചെയ്ത് മികച്ചവയെ കണ്ടെത്തുക.")
+
+        sc_col1, sc_col2, sc_col3 = st.columns(3)
+        universe_choice = sc_col1.selectbox("സ്കാൻ ചെയ്യേണ്ട മാർക്കറ്റ് ബാസ്കറ്റ്:", [
+            "🇮🇳 ഇന്ത്യൻ ലാർജ് & മിഡ് ക്യാപ് ലീഡേഴ്സ് (NSE Top Basket)",
+            "🇮🇳 ഐ.ടി, ഫാർമ & എൻജിനീയറിംഗ് (Moat Basket)",
+            "🇺🇸 യു.എസ് ടെക് & ഗ്ലോബൽ ടൈറ്റൻസ് (US Wall Street Basket)"
+        ])
+        min_roe_filter = sc_col2.slider("കുറഞ്ഞ ലാഭക്ഷമത (Minimum ROE %):", 0, 40, 14)
+        max_debt_filter = sc_col3.slider("പരമാവധി കടം (Max Debt/MCap %):", 5, 100, 33 if is_shariah else 50)
+
+        if st.button("🔄 ഇപ്പോൾ മാർക്കറ്റ് ലൈവ് ആയി സ്ക്രീൻ ചെയ്യുക (Run Live Market Scan Now)", type="primary"):
+            if "US" in universe_choice:
+                basket = ["NVDA", "MSFT", "AAPL", "GOOGL", "AMZN", "META", "AVGO", "LLY", "TSLA", "BRK-B"]
+            elif "Moat" in universe_choice:
+                basket = ["TCS.NS", "INFY.NS", "HCLTECH.NS", "PERSISTENT.NS", "POLYCAB.NS", "TATAELXSI.NS", "SUNPHARMA.NS", "DRREDDY.NS", "ASTRAL.NS", "CUMMINSIND.NS"]
+            else:
+                basket = ["TCS.NS", "RELIANCE.NS", "INFY.NS", "SUNPHARMA.NS", "TITAN.NS", "POLYCAB.NS", "LT.NS", "BHARTIARTL.NS", "MARUTI.NS", "TRENT.NS", "BEL.NS", "HAL.NS", "ITC.NS", "SBIN.NS"]
+
+            screened_rows = []
+            prog = st.progress(0, text="⏳ ലൈവ് മാർക്കറ്റ് ഡാറ്റ സ്കാൻ ചെയ്യുന്നു...")
+            for idx, sym in enumerate(basket):
+                prog.progress((idx + 1) / len(basket), text=f"⏳ പരിശോധിക്കുന്നു: {sym}...")
+                res_a = analyze_any_stock_deep(sym)
+                if res_a:
+                    if is_shariah and not res_a['shariah_pass']:
+                        continue
+                    if res_a['roe'] >= min_roe_filter and res_a['debt_to_mcap'] <= max_debt_filter:
+                        screened_rows.append({
+                            "Symbol": sym.replace(".NS", ""),
+                            "Company": res_a['name'],
+                            "Price": f"{res_a['curr_sym']}{res_a['price']:,.1f}",
+                            "ROE (%)": f"{res_a['roe']:.1f}%",
+                            "Debt/MCap (%)": f"{res_a['debt_to_mcap']:.1f}%",
+                            "P/E": f"{res_a['pe']:.1f}x",
+                            "1Y Return": f"{res_a['ret_1y']:+.1f}%",
+                            "Shariah": "✅ Halal" if res_a['shariah_pass'] else "❌ Non-Halal",
+                            "10Y Moat": res_a['suit_10y'][:18],
+                            "Verdict": res_a['verdict'].split(" (")[0]
+                        })
+            prog.empty()
+            if screened_rows:
+                st.success(f"✅ നിങ്ങളുടെ മാനദണ്ഡങ്ങൾ പാസ്സായ **{len(screened_rows)} മികച്ച കമ്പനികൾ** തത്സമയം കണ്ടെത്തി!")
+                st.dataframe(pd.DataFrame(screened_rows), use_container_width=True, hide_index=True)
+            else:
+                st.warning("ഈ ഫിൽട്ടറിൽ കമ്പനികൾ ഒന്നും വന്നില്ല. ROE അല്ലെങ്കിൽ Debt പരിധി അല്പം മാറ്റി വീണ്ടും സ്കാൻ ചെയ്യുക.")
+
+# ##################################################################
+# 🎟️ MODULE 2: LIVE IPO RADAR (OPEN & UPCOMING IPOS + ANALYZER)
+# ##################################################################
+elif main_menu == MENU_ITEMS[2]:
+    st.title("🎟️ ലൈവ് ഐ.പി.ഒ (IPO) റഡാർ — നിലവിലുള്ളതും വരാൻ പോകുന്നതുമായ IPO-കൾ")
+    st.caption("ഇപ്പോൾ മാർക്കറ്റിൽ ഓപ്പൺ ആയിട്ടുള്ളതും (Open IPOs), ഇനി വരാൻ പോകുന്നതുമായ (Upcoming IPOs) ഐ.പി.ഒകളുടെ തത്സമയ വിവരങ്ങളും വാറൻ ബഫറ്റ് റെഡ്-ഫ്ലാഗ് പരിശോധനയും.")
+
+    col_ipo1, col_ipo2 = st.columns([3, 1])
+    col_ipo1.subheader("📡 നിലവിൽ ഓപ്പൺ ആയതും വരാൻ പോകുന്നതുമായ ലൈവ് IPO ഫീഡ് (Live NSE & Market Feed)")
+    if col_ipo2.button("🔄 ലൈവ് IPO ലിസ്റ്റ് റിഫ്രഷ് ചെയ്യുക", use_container_width=True):
+        st.cache_data.clear()
+
+    with st.spinner("⏳ നിലവിലുള്ളതും വരാൻ പോകുന്നതുമായ IPO വിവരങ്ങൾ ഇന്റർനെറ്റിൽ നിന്ന് ശേഖരിക്കുന്നു..."):
+        live_ipos = fetch_live_ipos_india()
+        if live_ipos:
+            st.dataframe(pd.DataFrame(live_ipos), use_container_width=True, hide_index=True)
+        else:
+            st.info("നിലവിൽ ലൈവ് ഫീഡ് ലഭ്യമല്ല. താഴെയുള്ള IPO അനലൈസർ ഉപയോഗിക്കുക.")
+
+    st.markdown("---")
+    st.subheader("🧮 ഏതൊരു പുതിയ IPO-യും നിക്ഷേപത്തിന് നല്ലതാണോ എന്ന് പരിശോധിക്കാം (IPO Eligibility & Risk Checker)")
+    st.info("💡 **എങ്ങനെ നിക്ഷേപിക്കാം?** Upstox, Groww, അല്ലെങ്കിൽ Zerodha ആപ്പിലെ **IPO** വിഭാഗത്തിൽ പോയി **UPI ID** നൽകി അപേക്ഷിക്കാം. പണം ബാങ്കിൽ ബ്ലോക്ക് ആകുകയേ ഉള്ളൂ, അലോട്ട്മെന്റ് കിട്ടിയാൽ മാത്രമേ പണം കട്ട് ആവുകയുള്ളൂ!")
+
+    ic1, ic2, ic3 = st.columns(3)
+    ipo_name = ic1.text_input("പരിശോധിക്കേണ്ട IPO കമ്പനിയുടെ പേര്:", value="Upcoming Mainboard IPO")
+    ipo_type = ic2.selectbox("IPO വിഭാഗം:", ["🟢 Mainboard IPO (മിനിമം ~₹15,000 - സുരക്ഷിതം)", "🔴 SME IPO (മിനിമം ₹1.2 ലക്ഷം - ഉയർന്ന റിസ്ക്)"])
+    ofs_pct = ic3.slider("OFS ശതമാനം (പഴയ ഉടമകൾ ഓഹരി വിറ്റ് പുറത്തുപോകുന്നത് %):", 0, 100, 20)
+
+    ic4, ic5, ic6 = st.columns(3)
+    gmp_pct = ic4.slider("നിലവിലെ GMP (Grey Market Premium %):", -20, 120, 25)
+    pe_val = ic5.selectbox("കമ്പനിയുടെ വില നിലവാരം (P/E Valuation):", ["🟢 മറ്റ് കമ്പനികളേക്കാൾ കുറഞ്ഞ വില (Undervalued)", "🟡 ന്യായമായ വില (Fairly Priced)", "🔴 അമിത വില (Overpriced > 50x P/E)"])
+    debt_stat = ic6.selectbox("കമ്പനിയുടെ കടവും ബിസിനസ്സും:", ["🟢 കടം < 33% & ഹലാൽ ബിസിനസ്സ്", "🟡 കടം കമ്പനി IPO പണം കൊണ്ട് വീട്ടുന്നു", "🔴 അമിത കടം / ബാങ്കിംഗ് / നോൺ-ഹലാൽ"])
+
+    score = 100
+    notes = []
+    if "SME" in ipo_type:
+        score -= 25
+        notes.append("⚠️ **SME IPO മുന്നറിയിപ്പ്:** SME ഐ.പി.ഒകളിൽ ലിക്വിഡിറ്റി കുറവാണ്, കൃത്രിമത്വം നടക്കാൻ സാധ്യതയുള്ളതിനാൽ ചെറുകിട നിക്ഷേപകർ ജാഗ്രത പാലിക്കുക.")
+    if ofs_pct > 50:
+        score -= 35
+        notes.append(f"🚨 **OFS കെണി ({ofs_pct}%):** സമാഹരിക്കുന്ന പണത്തിന്റെ ഭൂരിഭാഗവും പഴയ ഉടമകളുടെ കീശയിലേക്കാണ് പോകുന്നത്, കമ്പനിയുടെ വളർച്ചയ്ക്കല്ല!")
+    else:
+        notes.append(f"✅ **Fresh Issue ({100-ofs_pct}%):** പണം കമ്പനിയുടെ വികസനത്തിനും കടം വീട്ടാനും ഉപയോഗിക്കുന്നു.")
+    if gmp_pct >= 20:
+        notes.append(f"✅ **മികച്ച GMP (+{gmp_pct}%):** ലിസ്റ്റിംഗ് ദിവസം ലാഭം (Listing Gain) കിട്ടാൻ സാധ്യത വളരെ കൂടുതലാണ്.")
+    elif gmp_pct < 10:
+        score -= 25
+        notes.append(f"🚨 **കുറഞ്ഞ GMP ({gmp_pct}%):** ലിസ്റ്റിംഗിൽ നഷ്ടം വരാൻ സാധ്യതയുണ്ട്.")
+    if "🔴" in pe_val:
+        score -= 25
+        notes.append("🚨 **അമിത വില (Valuation Trap):** ലിസ്റ്റിംഗിന് ശേഷം വില ഇടിയാൻ സാധ്യതയുണ്ട്.")
+    if "🔴" in debt_stat and is_shariah:
+        score -= 40
+        notes.append("🛑 **ശരീഅത്ത് വിരുദ്ധം:** ഉയർന്ന കടമോ നിരോധിത ബിസിനസ്സോ ആയതിനാൽ ശരീഅത്ത് മോഡിൽ ഒഴിവാക്കുക.")
+
+    if score >= 75:
+        st.success(f"🏆 **{ipo_name} — സ്കോർ: {score}/100 -> നിക്ഷേപത്തിന് അനുയോജ്യം (APPLY FOR IPO)!** (റീട്ടെയിൽ ക്വാട്ടയിൽ 1 Lot = ~₹14,800-ന് അപേക്ഷിക്കുക).")
+    elif score >= 50:
+        st.warning(f"⚖️ **{ipo_name} — സ്കോർ: {score}/100 -> ശരാശരി (അവസാന ദിവസം QIB സബ്സ്ക്രിപ്ഷൻ > 15x ആണെങ്കിൽ മാത്രം അപേക്ഷിക്കുക).**")
+    else:
+        st.error(f"🛑 **{ipo_name} — സ്കോർ: {score}/100 -> ഒഴിവാക്കുക (AVOID THIS IPO)!** നിങ്ങളുടെ മൂലധനം സംരക്ഷിക്കുക.")
+
+    for n in notes:
+        st.markdown(f"- {n}")
+
+# ##################################################################
+# 📈 MODULE 3: LIVE MUTUAL FUND SCREENER (ALL 10,000+ AMFI FUNDS)
+# ##################################################################
+elif main_menu == MENU_ITEMS[3]:
+    st.title("📈 ലൈവ് മ്യൂച്വൽ ഫണ്ട് സെർച്ച് & സ്ക്രീനർ (All 10,000+ Indian Mutual Funds)")
+    st.caption("ഇന്ത്യയിലെ ഏതൊരു മ്യൂച്വൽ ഫണ്ടിന്റെയും പേര് ടൈപ്പ് ചെയ്ത് അതിന്റെ തത്സമയ NAV-യും, 1Y, 3Y, 5Y CAGR ലാഭവും പരിശോധിക്കാം.")
+
+    mf_q = st.text_input("🔍 മ്യൂച്വൽ ഫണ്ടിന്റെ പേര് ടൈപ്പ് ചെയ്യുക (ഉദാ: Tata Ethical, Parag Parikh, Quant, SBI, Gold):", value="Tata Ethical")
+    mf_results = search_live_mutual_funds(mf_q)
+
+    if mf_results:
+        mf_options = [f"{item['schemeCode']} | {item['schemeName']}" for item in mf_results]
+        sel_mf = st.selectbox("✅ താഴെ കാണുന്ന ഫണ്ടുകളിൽ നിന്ന് നിങ്ങൾക്ക് പരിശോധിക്കേണ്ടത് തിരഞ്ഞെടുക്കുക:", mf_options)
+        sel_code = sel_mf.split(" | ")[0].strip()
+
+        with st.spinner("⏳ AMFI സെർവറിൽ നിന്ന് ഫണ്ടിന്റെ ലൈവ് NAV-യും 5 വർഷത്തെ ലാഭവും കണക്കാക്കുന്നു..."):
+            mf_data = analyze_mutual_fund_scheme(sel_code)
+            if mf_data:
+                st.success(f"🏛️ **{mf_data['name']}** ({mf_data['house']} | {mf_data['category']})")
+                mc1, mc2, mc3, mc4 = st.columns(4)
+                mc1.metric("നിലവിലെ NAV", f"₹{mf_data['nav']:.2f}", f"Date: {mf_data['date']}")
+                mc2.metric("1 വർഷത്തെ ലാഭം (1Y Return)", f"{mf_data['cagr_1y']:.1f}%")
+                mc3.metric("3 വർഷത്തെ ശരാശരി (3Y CAGR)", f"{mf_data['cagr_3y']:.1f}% p.a.", "✅ മികച്ചത്" if mf_data['cagr_3y'] >= 15 else "ശരാശരി")
+                mc4.metric("5 വർഷത്തെ ശരാശരി (5Y CAGR)", f"{mf_data['cagr_5y']:.1f}% p.a.", "🏆 Compounder" if mf_data['cagr_5y'] >= 15 else "Hold")
+
+                if "Direct" not in mf_data['name']:
+                    st.warning("⚠️ **ശ്രദ്ധിക്കുക:** ഇതൊരു 'Regular Plan' ആണ്. കമ്മീഷൻ ഒഴിവാക്കി കൂടുതൽ ലാഭം കിട്ടാൻ എപ്പോഴും ഇതേ ഫണ്ടിന്റെ **'Direct Plan - Growth'** തിരഞ്ഞെടുക്കുക!")
+                else:
+                    st.info("✅ ഇതൊരു **Direct Plan** ആണ് (കമ്മീഷൻ ഇല്ലാത്തത്). 5+ വർഷത്തെ SIP നിക്ഷേപത്തിന് അനുയോജ്യം.")
+
+# ##################################################################
+# 💳 MODULE 4: DEBT FREEDOM & LOAN ELIMINATION PLANNER
+# ##################################################################
+elif main_menu == MENU_ITEMS[4]:
+    st.title("💳 കടം തീർക്കൽ & സാമ്പത്തിക മോചന എൻജിൻ (Debt Freedom Planner)")
+    with st.expander("➕ പുതിയ ലോൺ / കടം ചേർക്കുക", expanded=True):
         dc1, dc2, dc3 = st.columns(3)
-        loan_cat = dc1.selectbox(
-            "കടത്തിന്റെ വിഭാഗം തിരഞ്ഞെടുക്കുക:" if is_ml else "Select Loan / Debt Category:",
-            [
-                "💳 ക്രെഡിറ്റ് കാർഡ് കുടിശ്ശിക (Credit Card - 36% to 42%)",
-                "⚠️ വ്യക്തിഗത കടം / പുറത്തുനിന്ന് വാങ്ങിയത് (Informal / Private Debt)",
-                "🏦 പേഴ്സണൽ ലോൺ / ആപ്പ് ലോൺ (Personal / App Loan - 14% to 28%)",
-                "🪙 ഗോൾഡ് ലോൺ / സ്വർണ്ണപ്പണയം (Gold Loan - 9% to 18%)",
-                "🚗 വാഹന ലോൺ (Vehicle Loan - 9% to 14%)",
-                "🏠 ഹോം ലോൺ / ഭവന വായ്പ (Home Loan - 8% to 10%)",
-                "🎓 എജ്യുക്കേഷൻ / മറ്റ് ലോണുകൾ (Education / Other Loan)"
-            ]
-        )
-        lender_name = dc2.text_input("ബാങ്ക് / വ്യക്തിയുടെ പേര് (ഉദാ: HDFC, സുഹൃത്ത്):" if is_ml else "Bank / Lender Name (e.g. HDFC, Friend):")
-        loan_status = dc3.selectbox(
-            "നിലവിലെ അവസ്ഥ (Current Status):" if is_ml else "Current Repayment Status:",
-            [
-                "🟢 കൃത്യമായി EMI അടച്ചുപോകുന്നു (Regular / Active)",
-                "🟡 1-2 മാസം അടവ് മുടങ്ങി (Overdue / Stress)",
-                "🔴 പൂർണ്ണമായി മുടങ്ങി / റിക്കവറി ഭീഷണി (Defaulted / NPA / Critical)"
-            ]
-        )
-
+        loan_cat = dc1.selectbox("കടത്തിന്റെ വിഭാഗം:", [
+            "💳 ക്രെഡിറ്റ് കാർഡ് കുടിശ്ശിക (36% - 42%)",
+            "⚠️ വ്യക്തിഗത കടം / പുറത്തുനിന്ന് വാങ്ങിയത് (Private Debt)",
+            "🏦 പേഴ്സണൽ ലോൺ / ആപ്പ് ലോൺ (14% - 28%)",
+            "🪙 ഗോൾഡ് ലോൺ / സ്വർണ്ണപ്പണയം (9% - 18%)",
+            "🚗 വാഹന ലോൺ (9% - 14%)",
+            "🏠 ഹോം ലോൺ (8% - 10%)"
+        ])
+        lender_name = dc2.text_input("ബാങ്ക് / വ്യക്തിയുടെ പേര്:")
+        loan_status = dc3.selectbox("നിലവിലെ അവസ്ഥ:", [
+            "🟢 കൃത്യമായി EMI അടച്ചുപോകുന്നു (Regular)",
+            "🟡 1-2 മാസം അടവ് മുടങ്ങി (Overdue)",
+            "🔴 പൂർണ്ണമായി മുടങ്ങി / റിക്കവറി ഭീഷണി (Defaulted / Critical)"
+        ])
         dc4, dc5, dc6 = st.columns(3)
-        tot_debt_amt = dc4.number_input("ഇനി കൊടുത്തുതീർക്കാനുള്ള ആകെ തുക (₹):" if is_ml else "Total Outstanding Principal (₹):", min_value=500.0, value=50000.0, step=5000.0)
-        int_rate = dc5.number_input("വാർഷിക പലിശ നിരക്ക് (% - അറിയില്ലെങ്കിൽ 0):" if is_ml else "Annual Interest Rate (% - 0 if interest-free):", min_value=0.0, max_value=120.0, value=14.0, step=1.0)
-        monthly_emi = dc6.number_input("പ്രതിമാസ അടവ് / EMI (₹ - ഇല്ലെങ്കിൽ 0):" if is_ml else "Monthly EMI (₹ - 0 if lump-sum):", min_value=0.0, value=2500.0, step=500.0)
+        tot_debt_amt = dc4.number_input("ഇനി കൊടുത്തുതീർക്കാനുള്ള ആകെ തുക (₹):", min_value=500.0, value=50000.0, step=5000.0)
+        int_rate = dc5.number_input("വാർഷിക പലിശ നിരക്ക് (%):", min_value=0.0, max_value=120.0, value=14.0, step=1.0)
+        monthly_emi = dc6.number_input("പ്രതിമാസ അടവ് / EMI (₹):", min_value=0.0, value=2500.0, step=500.0)
 
-        col_btn1, col_btn2 = st.columns([2, 1])
-        if col_btn1.button("💾 കടങ്ങളുടെ ലിസ്റ്റിലേക്ക് ചേർക്കുക (Save Debt)" if is_ml else "💾 Add to My Debt Priority List", type="primary", use_container_width=True):
-            try:
-                conn = get_db_connection()
-                c = conn.cursor()
-                c.execute('''INSERT INTO user_debts (user_hash, loan_type, lender, total_amount, interest_rate, emi, status, notes)
-                             VALUES (?, ?, ?, ?, ?, ?, ?, ?)''',
-                          (USER_HASH, loan_cat, lender_name or "Lender", tot_debt_amt, int_rate, monthly_emi, loan_status, ""))
-                conn.commit()
-                conn.close()
-                st.success("✅ കടം ലിസ്റ്റിൽ ചേർത്തു! താഴെ നിങ്ങളുടെ പ്രയോറിറ്റി പ്ലാൻ കാണാം." if is_ml else "✅ Debt added! View your priority payoff plan below.")
-                st.rerun()
-            except Exception as e:
-                st.error(f"Error: {e}")
-
-        if col_btn2.button("🗑️ ലിസ്റ്റ് മുഴുവൻ മായ്ക്കുക (Clear All)" if is_ml else "🗑️ Clear All Debts", use_container_width=True):
+        b_c1, b_c2 = st.columns([2, 1])
+        if b_c1.button("💾 കടങ്ങളുടെ ലിസ്റ്റിലേക്ക് ചേർക്കുക", type="primary", use_container_width=True):
+            conn = get_db_connection()
+            conn.execute("INSERT INTO user_debts (user_hash, loan_type, lender, total_amount, interest_rate, emi, status, notes) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                         (USER_HASH, loan_cat, lender_name or "Lender", tot_debt_amt, int_rate, monthly_emi, loan_status, ""))
+            conn.commit()
+            conn.close()
+            st.rerun()
+        if b_c2.button("🗑️ ലിസ്റ്റ് മുഴുവൻ മായ്ക്കുക", use_container_width=True):
             conn = get_db_connection()
             conn.execute("DELETE FROM user_debts WHERE user_hash=?", (USER_HASH,))
             conn.commit()
             conn.close()
             st.rerun()
 
-    # Load and Analyze User Debts
     conn = get_db_connection()
-    df_debts = pd.read_sql_query("SELECT id, loan_type, lender, total_amount, interest_rate, emi, status FROM user_debts WHERE user_hash=?", conn, params=(USER_HASH,))
+    df_debts = pd.read_sql_query("SELECT loan_type, lender, total_amount, interest_rate, emi, status FROM user_debts WHERE user_hash=?", conn, params=(USER_HASH,))
     conn.close()
-
     if not df_debts.empty:
-        total_debt_sum = df_debts['total_amount'].sum()
-        total_emi_sum = df_debts['emi'].sum()
-        # Calculate annual interest drain
-        df_debts['annual_interest_rs'] = (df_debts['total_amount'] * df_debts['interest_rate']) / 100.0
-        df_debts['monthly_interest_rs'] = df_debts['annual_interest_rs'] / 12.0
-        total_monthly_interest = df_debts['monthly_interest_rs'].sum()
-
-        # Priority Scoring: Defaulted/Overdue + High Interest gets #1 Priority (Debt Avalanche + Crisis Triage)
-        def calc_urgency_score(row):
-            status_boost = 50.0 if "🔴" in str(row['status']) else (25.0 if "🟡" in str(row['status']) else 0.0)
-            return float(row['interest_rate']) + status_boost
-
-        df_debts['urgency_score'] = df_debts.apply(calc_urgency_score, axis=1)
-        df_sorted = df_debts.sort_values(by=['urgency_score', 'total_amount'], ascending=[False, True]).reset_index(drop=True)
-        df_sorted['Priority Rank'] = [f"🔥 #{i+1} (ആദ്യം വീട്ടുക)" if i == 0 else f"#{i+1}" for i in range(len(df_sorted))]
-
-        st.markdown("---")
-        m_d1, m_d2, m_d3 = st.columns(3)
-        m_d1.metric("ആകെ കൊടുത്തുതീർക്കാനുള്ള കടം" if is_ml else "Total Debt Burden", f"₹{total_debt_sum:,.0f}")
-        m_d2.metric("മാസം തോറും അടയ്ക്കുന്ന ആകെ EMI" if is_ml else "Total Monthly EMI Outflow", f"₹{total_emi_sum:,.0f}")
-        m_d3.metric("മാസം തോറും പലിശയായി നഷ്ടപ്പെടുന്നത്!" if is_ml else "Monthly Interest Drain (Wasted)", f"₹{total_monthly_interest:,.0f}", delta="-Interest Drain", delta_color="inverse")
-
-        st.subheader("🎯 നിങ്ങൾ കടം വീട്ടേണ്ട മുൻഗണനാ ക്രമം (Priority Payoff Order)" if is_ml else "🎯 Your Automated Debt Payoff Priority List")
-        display_df = pd.DataFrame({
-            "മുൻഗണന (Priority)": df_sorted['Priority Rank'],
-            "ലോൺ വിഭാഗം (Loan Type)": df_sorted['loan_type'],
-            "ബാങ്ക് / വ്യക്തി": df_sorted['lender'],
-            "ആകെ തുക (₹)": df_sorted['total_amount'].map(lambda x: f"₹{x:,.0f}"),
-            "പലിശ (%)": df_sorted['interest_rate'].map(lambda x: f"{x:.1f}%"),
-            "മാസ പലിശ നഷ്ടം": df_sorted['monthly_interest_rs'].map(lambda x: f"₹{x:,.0f}/m"),
-            "EMI (₹)": df_sorted['emi'].map(lambda x: f"₹{x:,.0f}"),
-            "നിലവിലെ അവസ്ഥ (Status)": df_sorted['status']
-        })
-        st.dataframe(display_df, use_container_width=True, hide_index=True)
-
-        top_debt = df_sorted.iloc[0]
-        st.error(f"🚨 **ഏറ്റവും ആദ്യം തീർക്കേണ്ട കടം (Priority #1):** `{top_debt['lender']} - {top_debt['loan_type']}` (തുക: ₹{top_debt['total_amount']:,.0f} | പലിശ: {top_debt['interest_rate']}%). മറ്റെല്ലാ ലോണുകളുടെയും സാധാരണ EMI മുടങ്ങാതെ അടച്ചുകൊണ്ട്, നിങ്ങളുടെ കയ്യിൽ കിട്ടുന്ന ഓരോ അധിക രൂപയും ഈ ഒന്നാമത്തെ കടം പൂർണ്ണമായി തീർക്കാൻ മാത്രം ഉപയോഗിക്കുക!")
-
-    st.markdown("---")
-    st.subheader("🛠️ എത്രയും വേഗം കടം തീർക്കാനും EMI മുടങ്ങിയവർക്ക് രക്ഷപ്പെടാനുമുള്ള 5 പ്രായോഗിക മാർഗ്ഗങ്ങൾ" if is_ml else "🛠️ 5 Proven Institutional & Legal Strategies to Escape Debt")
-    with st.expander("1️⃣ അസറ്റ് ലിക്വിഡേഷൻ (സ്വർണ്ണമോ ഉപയോഗിക്കാത്ത വസ്തുക്കളോ വിറ്റ് വലിയ പലിശ ഒഴിവാക്കുക)", expanded=True):
-        st.markdown("""
-        * **തെറ്റായ രീതി:** കയ്യിൽ സ്വർണ്ണമോ, ഉപയോഗിക്കാത്ത വാഹനമോ, സ്ഥലമോ വെച്ചുകൊണ്ട് 18%–36% പലിശയുള്ള പേഴ്സണൽ ലോണും ക്രെഡിറ്റ് കാർഡ് കടവും വർഷങ്ങളോളം അടച്ചുകൊണ്ടിരിക്കുന്നത് വലിയ സാമ്പത്തിക നഷ്ടമാണ്.
-        * **ശരിയായ രീതി:** ഉയർന്ന പലിശയുള്ള കടങ്ങൾ ഒറ്റയടിക്ക് തീർക്കാൻ കയ്യിലുള്ള നിഷ്ക്രിയ ആസ്തികൾ (Idle Assets / Gold) വിൽക്കുകയോ, അല്ലെങ്കിൽ 9% പലിശയുള്ള ഗോൾഡ് ലോൺ എടുത്ത് 36% പലിശയുള്ള ക്രെഡിറ്റ് കാർഡ്/പേഴ്സണൽ ലോൺ അന്ന് തന്നെ ക്ലോസ് ചെയ്യുകയോ ചെയ്യുക (**Debt Consolidation**). കടം തീർത്ത ശേഷം ആ EMI തുക വെച്ച് സ്വർണ്ണം തിരികെ വാങ്ങാം!
-        """)
-    with st.expander("2️⃣ EMI പൂർണ്ണമായി മുടങ്ങിയവർ അറിയേണ്ട നിയമപരമായ വഴികൾ (Loan Default / OTS / Restructuring)"):
-        st.markdown("""
-        * **മോറട്ടോറിയം / റീസ്ട്രക്ചറിംഗ് (Loan Restructuring):** ജോലി നഷ്ടപ്പെടുകയോ ബിസിനസ്സ് തകരുകയോ ചെയ്താൽ ബാങ്ക് മാനേജരെ നേരിട്ട് കണ്ട് ലോൺ കാലാവധി കൂട്ടി EMI തുക കുറച്ചുതരാൻ (Tenure Extension) രേഖാമൂലം അപേക്ഷിക്കാം.
-        * **വൺ-ടൈം സെറ്റിൽമെന്റ് (One-Time Settlement - OTS):** അൺസെക്യൂർഡ് ലോണുകൾ (ക്രെഡിറ്റ് കാർഡ്, പേഴ്സണൽ ലോൺ) 90 ദിവസത്തിലധികം മുടങ്ങി NPA ആയാൽ, പിഴപ്പലിശ ഒഴിവാക്കി മുതലിന്റെ ഒരു നിശ്ചിത ശതമാനം മാത്രം ഒറ്റത്തവണയായി അടച്ച് ലോൺ ക്ലോസ് ചെയ്യാൻ ബാങ്കുമായി ചർച്ച ചെയ്യാം (ശ്രദ്ധിക്കുക: ഇത് CIBIL സ്കോറിനെ ബാധിക്കും, പക്ഷേ കടക്കെണിയിൽ നിന്ന് രക്ഷപ്പെടാം).
-        * **RBI നിയമം:** റിക്കവറി ഏജന്റുമാർക്ക് രാവിലെ 8 മണിക്ക് മുൻപോ വൈകുന്നേരം 7 മണിക്ക് ശേഷമോ വിളിക്കാനോ ഭീഷണിപ്പെടുത്താനോ അനുവാദമില്ല. അങ്ങനെ ചെയ്താൽ RBI Ombudsman-ൽ പരാതി നൽകാം.
-        """)
-    with st.expander("3️⃣ അവലാഞ്ച് vs സ്നോബോൾ രീതി (Avalanche vs. Snowball Method)"):
-        st.markdown("""
-        * **ഡെബ്റ്റ് അവലാഞ്ച് (Debt Avalanche - ഗണിതശാസ്ത്രപരമായി ഏറ്റവും മികച്ചത്):** ഏറ്റവും കൂടുതൽ പലിശയുള്ള കടം (ഉദാ: ക്രെഡിറ്റ് കാർഡ് / ബ്ലേഡ് പലിശ) ഒന്നാമതായി എടുത്ത് പൂർണ്ണമായി അടച്ചുതീർക്കുക.
-        * **ഡെബ്റ്റ് സ്നോബോൾ (Debt Snowball - മാനസിക ആശ്വാസത്തിന്):** തുക ഏറ്റവും കുറവുള്ള ചെറിയ കടങ്ങൾ (ഉദാ: ₹5,000, ₹10,000 സുഹൃത്തുക്കൾക്ക് കൊടുക്കാനുള്ളത്) ആദ്യം കൊടുത്തുതീർത്ത് കടങ്ങളുടെ എണ്ണം കുറയ്ക്കുക.
-        """)
+        df_debts['urgency'] = df_debts.apply(lambda r: float(r['interest_rate']) + (50 if "🔴" in str(r['status']) else (25 if "🟡" in str(r['status']) else 0)), axis=1)
+        df_sorted = df_debts.sort_values(by=['urgency', 'total_amount'], ascending=[False, True]).reset_index(drop=True)
+        df_sorted['Priority'] = [f"🔥 #{i+1} (ആദ്യം വീട്ടുക)" if i == 0 else f"#{i+1}" for i in range(len(df_sorted))]
+        st.dataframe(df_sorted[['Priority', 'loan_type', 'lender', 'total_amount', 'interest_rate', 'emi', 'status']], use_container_width=True, hide_index=True)
 
 # ##################################################################
-# 🎯 MODULE 2: DYNAMIC GOAL ALLOCATOR
+# 🎯 MODULE 5: DYNAMIC GOAL ALLOCATOR
 # ##################################################################
-elif main_menu == MENU_ITEMS[2]:
-    st.title(MENU_ITEMS[2])
-    with st.expander("📐 നിക്ഷേപ വിഹിതം നിശ്ചയിക്കുന്നതിന്റെ അടിസ്ഥാന തത്വങ്ങൾ (Criteria)" if is_ml else "📐 Asset Allocation Methodology"):
-        st.markdown("""
-        * **1 വർഷത്തെ ലക്ഷ്യം:** ഓഹരി വിപണിയിലെ ചാഞ്ചാട്ടം ഒഴിവാക്കാൻ ഇക്വിറ്റി **15%** ആയി പരിമിതപ്പെടുത്തി **50% ലിക്വിഡ് ക്യാഷും 25–35% സ്വർണ്ണവും** നിർദ്ദേശിക്കുന്നു.
-        * **3–5 വർഷത്തെ ലക്ഷ്യം:** സാധാരണ വിപണിയിൽ **60% ഇക്വിറ്റി**, യുദ്ധ സാഹചര്യത്തിൽ **40% ഇക്വിറ്റി**.
-        * **10+ വർഷത്തെ ലക്ഷ്യം:** കടരഹിത കുത്തക കമ്പനികളിൽ **65–75%** നിക്ഷേപിക്കുന്നു.
-        """)
-
+elif main_menu == MENU_ITEMS[5]:
+    st.title(MENU_ITEMS[5])
     c1, c2, c3 = st.columns(3)
-    inv_type = c1.selectbox("നിക്ഷേപ രീതി:" if is_ml else "Investment Mode:", ["Monthly SIP (പ്രതിമാസം)", "Lump-Sum (ഒറ്റത്തവണ)"])
-    inv_amount = c2.number_input("നിക്ഷേപ തുക (₹):" if is_ml else "Investment Amount (₹):", value=10000.0, step=1000.0)
-    goal_horizon = c3.selectbox(
-        "നിക്ഷേപ കാലാവധി:" if is_ml else "Time Horizon:",
-        [
-            "⏳ 1 Year (ഹ്രസ്വകാലം / Emergency)",
-            "🚀 3 - 5 Years (ഇടത്തരം വളർച്ച / വീട് / ബിസിനസ്സ്)",
-            "🏛️ 10+ Years (ദീർഘകാല സമ്പത്ത് / വിരമിക്കൽ)"
-        ]
-    )
+    inv_amount = c1.number_input("നിക്ഷേപ തുക (₹):", value=10000.0, step=1000.0)
+    goal_horizon = c2.selectbox("നിക്ഷേപ കാലാവധി:", ["⏳ 1 Year (ഹ്രസ്വകാലം)", "🚀 3 - 5 Years (ഇടത്തരം വളർച്ച)", "🏛️ 10+ Years (ദീർഘകാല സമ്പത്ത്)"])
+    market_climate = c3.selectbox("വിപണി സാഹചര്യം:", ["🟢 Normal Bull", "⚠️ War / Oil Spike", "🔴 Market Crash"])
 
-    market_climate = st.selectbox(
-        "നിലവിലെ വിപണി സാഹചര്യം:" if is_ml else "Current Market Regime:",
-        [
-            "🟢 Normal Bull (ശാന്തമായ വിപണി)",
-            "⚠️ War / Crude Oil Spike (യുദ്ധം / അസ്ഥിരത)",
-            "🔴 Extreme Market Crash (കടുത്ത തകർച്ച)"
-        ]
-    )
+    if "1 Year" in goal_horizon: eq_pct, gold_pct, cash_pct = 0.15, 0.35, 0.50
+    elif "3 - 5 Years" in goal_horizon: eq_pct, gold_pct, cash_pct = (0.40, 0.30, 0.30) if "War" in market_climate else (0.60, 0.20, 0.20)
+    else: eq_pct, gold_pct, cash_pct = (0.75, 0.15, 0.10) if "Crash" in market_climate else (0.70, 0.20, 0.10)
 
-    if "1 Year" in goal_horizon:
-        eq_pct, gold_pct, cash_pct, reit_pct = (0.15, 0.35, 0.50, 0.0) if is_shariah else (0.15, 0.25, 0.50, 0.10)
-    elif "3 - 5 Years" in goal_horizon:
-        if "War" in market_climate: eq_pct, gold_pct, cash_pct, reit_pct = 0.40, 0.30 if is_shariah else 0.25, 0.30 if is_shariah else 0.25, (0.0 if is_shariah else 0.10)
-        else: eq_pct, gold_pct, cash_pct, reit_pct = 0.60, 0.20 if is_shariah else 0.15, 0.20 if is_shariah else 0.15, (0.0 if is_shariah else 0.10)
-    else:
-        if "Crash" in market_climate: eq_pct, gold_pct, cash_pct, reit_pct = 0.75, 0.15, 0.10, 0.0
-        else: eq_pct, gold_pct, cash_pct, reit_pct = 0.70 if is_shariah else 0.65, 0.20 if is_shariah else 0.15, 0.10, (0.0 if is_shariah else 0.10)
-
-    a1, a2, a3, a4 = st.columns(4)
+    a1, a2, a3 = st.columns(3)
     a1.metric("ഇക്വിറ്റി ഓഹരികൾ", f"₹{(inv_amount * eq_pct):,.0f}", f"{int(eq_pct*100)}%")
     a2.metric("ഗോൾഡ് & സിൽവർ", f"₹{(inv_amount * gold_pct):,.0f}", f"{int(gold_pct*100)}%")
     a3.metric("ക്യാഷ് കരുതൽ", f"₹{(inv_amount * cash_pct):,.0f}", f"{int(cash_pct*100)}%")
-    if not is_shariah: a4.metric("REITs / Bonds", f"₹{(inv_amount * reit_pct):,.0f}", f"{int(reit_pct*100)}%")
-    else: a4.metric("ശരീഅത്ത് പാലനം", "100% Halal", "AAOIFI")
 
 # ##################################################################
-# 🏛️ MODULE 3: 50-YEAR MOAT VAULT & AUTO-COMPLETE LIVE SCANNER
+# 💼 MODULE 6: LIVE PORTFOLIO & ALL-BROKER WATCHDOG (WITH LIVE SEARCH)
 # ##################################################################
-elif main_menu == MENU_ITEMS[3]:
-    st.title(MENU_ITEMS[3])
-
-    with st.expander("📐 സ്റ്റോക്കുകൾ തിരഞ്ഞെടുക്കുന്നതിന്റെ മാനദണ്ഡങ്ങൾ (Stock Selection Criteria Blueprint)", expanded=False):
-        st.markdown("""
-        #### 1. വാറൻ ബഫറ്റ് & ചാർളി മംഗർ ക്വാളിറ്റി ഫിൽട്ടറുകൾ (Quantitative Moat Rules)
-        * **ROCE / ROE >= 15%–20%:** മുടക്കുന്ന മൂലധനത്തിന് മുകളിൽ മികച്ച ലാഭം നേടുന്ന കമ്പനികൾ.
-        * **Debt / Market Cap < 30% (കടരഹിത കമ്പനികൾ):** കടുത്ത സാമ്പത്തിക മാന്ദ്യം വന്നാലും തകർന്നുപോകാത്തവ.
-        * **ഉയർന്ന ക്യാഷ് ഫ്ലോ & മാർജിൻ:** യഥാർത്ഥ പണം കമ്പനിയിലേക്ക് വരുന്നത്.
-        
-        #### 2. AAOIFI ശരീഅത്ത് സ്ക്രീനിംഗ് നിയമങ്ങൾ
-        * **ബിസിനസ്സ് പരിശോധന:** പലിശ ബാങ്കിംഗ് (Riba), മദ്യം, പുകയില, ചൂതാട്ടം, ആയുധ നിർമ്മാണം എന്നിവയിലൊന്നും ഉൾപ്പെടാത്ത കമ്പനികൾ.
-        * **സാമ്പത്തിക അനുപാതം:** കമ്പനിയുടെ ആകെ കടം മാർക്കറ്റ് ക്യാപ്പിന്റെ **33%-ൽ താഴെ** ആയിരിക്കണം (`Total Debt / Market Cap < 33%`).
-        """)
-
-    # FIXED: Auto-Complete Stock Dropdown + Robust Yahoo Finance Data Extraction!
-    st.subheader("🔎 ഏത് സ്റ്റോക്കും പരിശോധിക്കാം: ഓട്ടോ-സെർച്ച് ലൈവ് സ്കാനർ" if is_ml else "🔎 Auto-Complete Live Fundamental, Shariah & Chart Scanner")
-    st.caption("💡 താഴെയുള്ള ബോക്സിൽ ക്ലിക്ക് ചെയ്ത് സ്റ്റോക്കിന്റെ ആദ്യ അക്ഷരങ്ങൾ (ഉദാ: `I` അല്ലെങ്കിൽ `P`) ടൈപ്പ് ചെയ്യുമ്പോൾത്തന്നെ പേരുകൾ ലിസ്റ്റ് ആയി വരും!" if is_ml else "💡 Click the box below and type the first letters (e.g., 'I' or 'P') to see matching stocks instantly!")
-
-    sc1, sc2 = st.columns([3, 1])
-    with sc1:
-        scan_ticker = select_stock_autocomplete(
-            "പരിശോധിക്കേണ്ട സ്റ്റോക്ക് തിരഞ്ഞെടുക്കുക (Type to Search):" if is_ml else "Type to Search & Select NSE Stock:",
-            NSE_STOCK_DIRECTORY,
-            key_prefix="moat_scanner",
-            default_index=3  # Defaults to POLYCAB so user immediately sees it working!
-        )
-
-    if scan_ticker:
-        yf_sym = scan_ticker if (".NS" in scan_ticker or ".BO" in scan_ticker) else f"{scan_ticker}.NS"
-        with st.spinner(f"⏳ {yf_sym} ഡാറ്റ പരിശോധിക്കുന്നു..."):
-            try:
-                tk = yf.Ticker(yf_sym)
-                info = tk.info or {}
-                hist_df = tk.history(period="1y")
-
-                # Validate that ticker actually exists and has market data
-                mcap = info.get("marketCap") or 0
-                curr_p = info.get("currentPrice") or info.get("regularMarketPrice") or (float(hist_df['Close'].iloc[-1]) if not hist_df.empty else 0)
-
-                if mcap == 0 and hist_df.empty:
-                    st.error(f"❌ `{scan_ticker}` എന്ന സിംബൽ കണ്ടെത്താനായില്ല! മുകളിലെ ലിസ്റ്റിൽ നിന്ന് കമ്പനിയുടെ ശരിയായ NSE സിംബൽ തിരഞ്ഞെടുക്കുക.")
-                else:
-                    comp_name = info.get("longName") or info.get("shortName") or scan_ticker
-                    sector = info.get("sector") or "Industrial / Diversified"
-                    industry = info.get("industry") or sector
-                    tot_debt = info.get("totalDebt") or 0
-                    tot_cash = info.get("totalCash") or 0
-
-                    # Robust ROE / Profit Margin calculation (Fallbacks if returnOnEquity is None)
-                    raw_roe = info.get("returnOnEquity")
-                    if raw_roe is None:
-                        net_inc = info.get("netIncomeToCommon") or 0
-                        book_val = info.get("bookValue") or 1
-                        shares = info.get("sharesOutstanding") or 1
-                        tot_eq = book_val * shares
-                        roe = (net_inc / tot_eq * 100) if tot_eq > 0 else ((info.get("profitMargins") or 0) * 100)
-                    else:
-                        roe = raw_roe * 100
-
-                    op_margin = (info.get("operatingMargins") or 0) * 100
-                    pe_ratio = info.get("trailingPE") or info.get("forwardPE") or 0
-
-                    debt_to_mcap = (tot_debt / mcap * 100) if mcap > 0 else 0.0
-                    cash_to_mcap = (tot_cash / mcap * 100) if mcap > 0 else 0.0
-
-                    non_halal_keywords = ["Bank", "Financial", "Insurance", "Tobacco", "Cigarette", "Brew", "Distill", "Alcohol", "Casino", "Gambling", "Aerospace & Defense"]
-                    is_prohibited_sector = any(k.lower() in (sector + " " + industry + " " + comp_name).lower() for k in non_halal_keywords)
-                    shariah_pass = (not is_prohibited_sector) and (debt_to_mcap < 33.0)
-                    buffett_pass = (roe >= 14.0) and (debt_to_mcap < 30.0)
-
-                    st.success(f"🏢 **{comp_name}** (`{yf_sym}`) | നിലവിലെ വില: **₹{curr_p:,.2f}** | P/E: `{pe_ratio:.1f}` | Op. Margin: `{op_margin:.1f}%`")
-                    k1, k2, k3, k4 = st.columns(4)
-                    k1.metric("സെക്ടർ (Sector)", sector)
-                    k2.metric("ROE / ലാഭക്ഷമത", f"{roe:.1f}%", "✅ മികച്ചത് (>=15%)" if roe >= 15 else "⚠️ ശരാശരി")
-                    k3.metric("കടം / Market Cap", f"{debt_to_mcap:.1f}%", "✅ സുരക്ഷിതം (<33%)" if debt_to_mcap < 33 else "❌ അമിത കടം")
-                    k4.metric("ശരീഅത്ത് & Moat സ്റ്റാറ്റസ്", "✅ ഹലാൽ (HALAL)" if shariah_pass else "❌ നോൺ-ഹലാൽ", "Buffett Moat: " + ("✅ Pass" if buffett_pass else "⚠️ Review"))
-
-                    if is_prohibited_sector:
-                        st.warning(f"⚠️ **ശരീഅത്ത് അറിയിപ്പ്:** `{comp_name}` ഉൾപ്പെടുന്ന സെക്ടർ (`{sector} - {industry}`) പലിശ/നിരോധിത വിഭാഗത്തിൽ വരുന്നതിനാൽ AAOIFI ശരീഅത്ത് പ്രകാരം ഹലാൽ അല്ല.")
-
-                    if not hist_df.empty:
-                        st.caption(f"📈 **{comp_name} - കഴിഞ്ഞ 1 വർഷത്തെ ലൈവ് പ്രൈസ് ചാർട്ട്:**")
-                        st.line_chart(hist_df['Close'])
-            except Exception as e:
-                st.error(f"ഡാറ്റ എടുക്കുന്നതിൽ തടസ്സം: {e}")
-
-    st.markdown("---")
-    st.subheader("🏛️ തിരഞ്ഞെടുത്ത 50-Year Moat ഓഹരികളും എക്സിറ്റ് നിയമങ്ങളും")
-    stocks_data = [
-        {"Stock": "TCS", "Sector": "IT Services", "Metrics": "ROCE: 58% | കടം: 0.6% | മാർജിൻ: 25%", "Why Buy?": "കടരഹിത ഭീമൻ, ഉയർന്ന ക്യാഷ് ഫ്ലോ, ആഗോള ഐ.ടി കുത്തക.", "Red Flags": "AI കാരണം ബില്ലിംഗ് കുറയുന്നത്.", "Exit Trigger": "ഓപ്പറേറ്റിംഗ് മാർജിൻ 20%-ൽ താഴെയാകുകയോ കടം 33% കടക്കുകയോ ചെയ്താൽ വിൽക്കുക.", "Status": "✅ ഹലാൽ (AAOIFI Pass)"},
-        {"Stock": "POLYCAB", "Sector": "Cables & Wires", "Metrics": "ROCE: 28% | കടം: 0.8% | മാർജിൻ: 14%", "Why Buy?": "ഇന്ത്യൻ വയർ-കേബിൾ വിപണിയിലെ 25%+ കുത്തക.", "Red Flags": "ചെമ്പ് വിലയിലുണ്ടാകുന്ന വലിയ ചാഞ്ചാട്ടം.", "Exit Trigger": "ഗവേണൻസ് പ്രശ്നങ്ങളോ വിപണി വിഹിതം നഷ്ടപ്പെടലോ ഉണ്ടായാൽ.", "Status": "✅ ഹലാൽ (AAOIFI Pass)"},
-        {"Stock": "TATAELXSI", "Sector": "Design & EV", "Metrics": "ROCE: 42% | കടം: 0.4% | മാർജിൻ: 27%", "Why Buy?": "ഇലക്ട്രിക് വാഹന സോഫ്റ്റ്‌വെയർ മേഖലയിലെ കുത്തക.", "Red Flags": "യൂറോപ്യൻ വാഹന വിപണിയിലെ മാന്ദ്യം.", "Exit Trigger": "വാർഷിക വരുമാന വളർച്ച 10%-ൽ താഴെയായാൽ ഒഴിവാക്കുക.", "Status": "✅ ഹലാൽ (AAOIFI Pass)"},
-        {"Stock": "SUNPHARMA", "Sector": "Specialty Pharma", "Metrics": "ROCE: 18% | കടം: 1.5% | മാർജിൻ: 26%", "Why Buy?": "ജീവൻരക്ഷാ മരുന്നുകൾ നിർമ്മിക്കുന്നതിനാൽ മാന്ദ്യത്തെ അതിജീവിക്കും.", "Red Flags": "USFDA റെഗുലേറ്ററി തടസ്സങ്ങൾ.", "Exit Trigger": "പ്രധാന പ്ലാന്റുകൾക്ക് സ്ഥിരമായി USFDA നിരോധനം വന്നാൽ.", "Status": "✅ ഹലാൽ (AAOIFI Pass)"}
-    ]
-    for s in stocks_data:
-        with st.expander(f"📌 {s['Stock']} — ({s['Sector']}) | 📊 {s['Metrics']}"):
-            st.markdown(f"**📐 തിരഞ്ഞെടുക്കാൻ കാരണമായ കണക്കുകൾ:** `{s['Metrics']}`")
-            st.markdown(f"**🟢 എന്തുകൊണ്ട് വാങ്ങണം:** {s['Why Buy?']}")
-            st.markdown(f"**⚠️ ശ്രദ്ധിക്കേണ്ട റിസ്കുകൾ:** {s['Red Flags']}")
-            st.error(f"🛑 **എപ്പോൾ വിറ്റ് ഒഴിവാക്കണം (Exit Trigger):** {s['Exit Trigger']}")
-
-# ##################################################################
-# 💼 MODULE 4: LIVE PORTFOLIO & ALL-BROKER WATCHDOG (WITH AUTO-COMPLETE)
-# ##################################################################
-elif main_menu == MENU_ITEMS[4]:
-    st.title(MENU_ITEMS[4])
-    h_tab1, h_tab2 = st.tabs(["⚡ ലൈവ് ബ്രോക്കർ സിങ്ക് (Upstox / Dhan / Zerodha)", "📝 മാനുവൽ പോർട്ട്ഫോളിയോ (Groww / Other - Auto Search)"])
+elif main_menu == MENU_ITEMS[6]:
+    st.title(MENU_ITEMS[6])
+    h_tab1, h_tab2 = st.tabs(["⚡ ലൈവ് ബ്രോക്കർ സിങ്ക് (Upstox / Dhan / Zerodha)", "📝 മറ്റ് ആപ്പുകളിലെ ഓഹരികൾ ചേർക്കുക (Universal Auto-Search)"])
 
     with h_tab1:
         b_choice = st.selectbox("ബ്രോക്കർ തിരഞ്ഞെടുക്കുക:", ["Upstox", "Dhan", "Zerodha"])
         user_token = st.sidebar.text_input(f"{b_choice} Token:", value=state['token'], type="password", key="holdings_token")
         if st.button(f"🔄 {b_choice}-ൽ നിന്ന് പോർട്ട്ഫോളിയോ എടുക്കുക"):
             if not user_token:
-                st.error(f"സൈഡ്‌ബാറിൽ {b_choice} Access Token നൽകുക!")
+                st.error("സൈഡ്‌ബാറിൽ Access Token നൽകുക!")
             else:
                 headers = {'Accept': 'application/json', 'Authorization': f'Bearer {user_token}'}
-                try:
-                    res = requests.get('https://api.upstox.com/v2/portfolio/long-term-holdings', headers=headers, timeout=10)
-                    data = res.json()
-                    if data.get('status') == 'success' and len(data.get('data', [])) > 0:
-                        st.dataframe(pd.DataFrame(data['data']), use_container_width=True)
-                    else:
-                        st.info(f"നിങ്ങളുടെ {b_choice} അക്കൗണ്ടിൽ നിലവിൽ ഹോൾഡിംഗ്സുകൾ ഒന്നും കണ്ടെത്തിയില്ല.")
-                except Exception as e:
-                    st.error(f"Error: {e}")
+                res = requests.get('https://api.upstox.com/v2/portfolio/long-term-holdings', headers=headers, timeout=10)
+                if res.status_code == 200 and len(res.json().get('data', [])) > 0:
+                    st.dataframe(pd.DataFrame(res.json()['data']), use_container_width=True)
+                else:
+                    st.info("നിങ്ങളുടെ അക്കൗണ്ടിൽ നിലവിൽ ഹോൾഡിംഗ്സുകൾ ഒന്നും കണ്ടെത്തിയില്ല.")
 
     with h_tab2:
-        st.subheader("📝 Groww / Zerodha / മറ്റ് ആപ്പുകളിലെ ഓഹരികൾ ചേർക്കുക (Auto-Complete Search)")
-        col_m1, col_m2, col_m3, col_m4 = st.columns([2, 1, 1, 1])
-        with col_m1:
-            m_sym = select_stock_autocomplete("സ്റ്റോക്ക് തിരഞ്ഞെടുക്കുക (Type to Search):", NSE_STOCK_DIRECTORY, key_prefix="port_man", default_index=0)
-        m_qty = col_m2.number_input("വാങ്ങിയ എണ്ണം (Qty):", value=1, min_value=1, step=1)
-        m_bp = col_m3.number_input("വാങ്ങിയ വില (₹):", value=1000.0, min_value=1.0, step=10.0)
-        m_plat = col_m4.selectbox("പ്ലാറ്റ്‌ഫോം:", ["Groww", "Zerodha", "AngelOne", "Upstox", "Other"])
+        m_sym = render_universal_stock_search("port_univ", market_filter="INDIA", default_query="TCS")
+        col_m1, col_m2, col_m3 = st.columns(3)
+        m_qty = col_m1.number_input("വാങ്ങിയ എണ്ണം (Qty):", value=1, min_value=1, step=1)
+        m_bp = col_m2.number_input("വാങ്ങിയ വില (₹):", value=500.0, min_value=1.0, step=10.0)
+        m_plat = col_m3.selectbox("പ്ലാറ്റ്‌ഫോം:", ["Groww", "Zerodha", "AngelOne", "Upstox", "Other"])
 
-        if st.button("➕ പോർട്ട്ഫോളിയോയിലേക്ക് ചേർക്കുക", type="primary"):
+        if st.button("➕ പോർട്ട്ഫോളിയോയിലേക്ക് ചേർക്കുക & ലൈവ് ഓഡിറ്റ് കാണുക", type="primary"):
             if m_sym:
                 conn = get_db_connection()
                 conn.execute("INSERT INTO manual_portfolio (user_hash, symbol, qty, buy_price, buy_date, notes) VALUES (?, ?, ?, ?, ?, ?)",
                              (USER_HASH, m_sym, m_qty, m_bp, datetime.date.today().strftime("%Y-%m-%d"), m_plat))
                 conn.commit()
                 conn.close()
-                st.success(f"✅ {m_sym} പോർട്ട്ഫോളിയോയിൽ ചേർത്തു!")
-                st.rerun()
+                st.success(f"✅ {m_sym} ചേർത്തു!")
 
         conn = get_db_connection()
         df_man = pd.read_sql_query("SELECT symbol AS Stock, qty AS Qty, buy_price AS [Buy Price], buy_date AS [Date], notes AS Broker FROM manual_portfolio WHERE user_hash=? ORDER BY id DESC", conn, params=(USER_HASH,))
@@ -694,126 +836,30 @@ elif main_menu == MENU_ITEMS[4]:
             st.dataframe(df_man, use_container_width=True, hide_index=True)
 
 # ##################################################################
-# 🎟️ MODULE 5: IPO RADAR & RED-FLAG ANALYZER (NEW!)
-# ##################################################################
-elif main_menu == MENU_ITEMS[5]:
-    st.title("🎟️ ഐ.പി.ഒ (IPO) റഡാർ & വാറൻ ബഫറ്റ് റെഡ്-ഫ്ലാഗ് ചെക്കർ" if is_ml else "🎟️ IPO Radar & Institutional Red-Flag Analyzer")
-    st.caption("പുതിയതായി വരുന്ന ഐ.പി.ഒകളിൽ (IPO) പണം നിക്ഷേപിക്കുന്നത് സുരക്ഷിതമാണോ? അതോ പ്രൊമോട്ടർമാരുടെ കെണിയാണോ എന്ന് പരിശോധിക്കാം." if is_ml else "Evaluate upcoming IPOs against institutional valuation, OFS traps, and Shariah compliance.")
-
-    with st.expander("📐 ഒരു IPO-യിൽ നിക്ഷേപിക്കുന്നതിന് മുൻപ് നിർബന്ധമായും നോക്കേണ്ട 5 നിയമങ്ങൾ (IPO Selection Criteria)", expanded=True):
-        st.markdown("""
-        1. **OFS കെണി (Offer For Sale vs. Fresh Issue):** IPO വഴി സമാഹരിക്കുന്ന പണം കമ്പനിയുടെ വളർച്ചയ്ക്കാണോ (**Fresh Issue**), അതോ പഴയ ഉടമകൾ അവരുടെ ഓഹരി വിറ്റ് പണവുമായി പുറത്തുപോകാനാണോ (**OFS**) എന്ന് നോക്കുക. **OFS 50%-ൽ കൂടുതലാണെങ്കിൽ സൂക്ഷിക്കുക!**
-        2. **വില നിലവാരം (P/E Valuation Trap):** അതേ മേഖലയിലുള്ള മറ്റ് ലിസ്റ്റഡ് കമ്പനികളേക്കാൾ അമിതമായ വിലയിലാണ് (High P/E) IPO വരുന്നതെങ്കിൽ ലിസ്റ്റിംഗിന് ശേഷം വില കുത്തനെ ഇടിയാൻ സാധ്യതയുണ്ട്.
-        3. **കടം വീട്ടൽ vs വളർച്ച:** Fresh Issue പണം പുതിയ ഫാക്ടറികൾ തുടങ്ങുന്നതിനും കടം പൂർണ്ണമായി തീർക്കുന്നതിനും ആണെങ്കിൽ അത് പോസിറ്റീവ് ആണ്.
-        4. **SME IPO അപകടം:** ₹1 ലക്ഷം രൂപയിലധികം മിനിമം നിക്ഷേപം വേണ്ട **SME IPO-കളിൽ** കൃത്രിമത്വം (Pump & Dump) നടക്കാൻ സാധ്യത കൂടുതലാണ്. തുടക്കക്കാർ **Mainboard IPO** (1 Lot = ~₹14,000 - ₹15,000) മാത്രം തിരഞ്ഞെടുക്കുക.
-        5. **എങ്ങനെ അപേക്ഷിക്കാം?** നിങ്ങളുടെ ബ്രോക്കർ ആപ്പിൽ (Upstox / Groww / Zerodha) **UPI ASBA** വഴി അപേക്ഷിക്കാം. പണം ബാങ്കിൽ ബ്ലോക്ക് ആകുകയേ ഉള്ളൂ, ഓഹരി ലഭിച്ചാൽ മാത്രമേ പണം കട്ട് ആവുകയുള്ളൂ!
-        """)
-
-    st.subheader("🧮 ലൈവ് IPO ഗുണനിലവാര കാൽക്കുലേറ്റർ (Test Any Upcoming IPO)" if is_ml else "🧮 Interactive IPO Quality & Risk Scorecard")
-    ic1, ic2, ic3 = st.columns(3)
-    ipo_name = ic1.text_input("IPO കമ്പനിയുടെ പേര്:", value="Sample Tech IPO")
-    ofs_pct = ic2.slider("OFS ശതമാനം (പഴയ ഉടമകൾ വിൽക്കുന്നത് %):", 0, 100, 25)
-    pe_diff = ic3.selectbox("സെക്ടറിലെ മറ്റ് കമ്പനികളുമായി താരതമ്യം ചെയ്യുമ്പോൾ വില (P/E):", ["🟢 കുറഞ്ഞ/ന്യായമായ വില (Fair Valuation)", "🟡 ശരാശരി വില (Fully Priced)", "🔴 അമിത വില (Overpriced > 50x P/E)"])
-
-    ic4, ic5, ic6 = st.columns(3)
-    gmp_pct = ic4.slider("നിലവിലെ GMP (Grey Market Premium %):", -20, 100, 20)
-    debt_post = ic5.selectbox("IPO-ക്ക് ശേഷം കമ്പനിയുടെ കടം:", ["🟢 കടരഹിതം (< 20% Debt)", "🟡 മിതമായ കടം", "🔴 അമിത കടം (> 33% Debt)"])
-    ipo_lot_size = ic6.number_input("1 ലോട്ടിന്റെ തുക (Retail 1 Lot Amount ₹):", value=14800.0, step=200.0)
-
-    score = 100
-    reasons = []
-    if ofs_pct > 50:
-        score -= 35
-        reasons.append(f"🚨 **OFS കെണി ({ofs_pct}%):** പഴയ ഉടമകൾ കമ്പനി വിട്ടുപോകുന്നു! കമ്പനിക്ക് ഈ പണം ലഭിക്കില്ല.")
-    else:
-        reasons.append(f"✅ **Fresh Issue മുൻഗണന ({100-ofs_pct}%):** പണം കമ്പനിയുടെ വളർച്ചയ്ക്ക് ഉപയോഗിക്കുന്നു.")
-
-    if "🔴" in pe_diff:
-        score -= 30
-        reasons.append("🚨 **അമിത വില (Overpriced):** ലിസ്റ്റിംഗിന് ശേഷം ഓഹരി വില ഇടിയാൻ സാധ്യതയുണ്ട്.")
-    if gmp_pct < 10:
-        score -= 20
-        reasons.append(f"⚠️ **കുറഞ്ഞ GMP ({gmp_pct}%):** ലിസ്റ്റിംഗ് ലാഭം (Listing Gain) കിട്ടാൻ സാധ്യത കുറവാണ്.")
-    if "🔴" in debt_post:
-        score -= 25
-        reasons.append("🚨 **ഉയർന്ന കടം:** ശരീഅത്ത് മോഡിലും ദീർഘകാല നിക്ഷേപത്തിനും അനുയോജ്യമല്ല.")
-
-    if score >= 75:
-        st.success(f"🌟 **IPO സ്കോർ: {score}/100 — മികച്ച IPO (Apply for Listing Gain / Long Term)!** നിക്ഷേപിക്കേണ്ട തുക: 1 Lot (`₹{ipo_lot_size:,.0f}`).")
-    elif score >= 50:
-        st.warning(f"⚠️ **IPO സ്കോർ: {score}/100 — ശരാശരി (ജാഗ്രത പാലിക്കുക)!** അവസാന ദിവസത്തെ QIB സബ്സ്ക്രിപ്ഷൻ (>10x) നോക്കി മാത്രം തീരുമാനിക്കുക.")
-    else:
-        st.error(f"🛑 **IPO സ്കോർ: {score}/100 — അപകടകരം (AVOID IPO)!** വാറൻ ബഫറ്റ് നിയമപ്രകാരം ഇത്തരം അമിത വിലയുള്ള OFS ഐ.പി.ഒകൾ ഒഴിവാക്കുക.")
-
-    for r in reasons:
-        st.markdown(f"- {r}")
-
-# ##################################################################
-# 📜 MODULE 6: BONDS, G-SECS & HALAL FIXED-INCOME ALTERNATIVES (NEW!)
-# ##################################################################
-elif main_menu == MENU_ITEMS[6]:
-    st.title("📜 ബോണ്ടുകൾ, കടപ്പത്രങ്ങൾ & സ്ഥിരവരുമാന മാർഗ്ഗങ്ങൾ" if is_ml else "📜 Bonds, G-Secs & Halal Fixed-Income Alternatives")
-
-    if is_shariah:
-        st.error("🌙 **പ്രധാന ശരീഅത്ത് നിയമം (AAOIFI Standard):** സാധാരണ ഗവൺമെന്റ് ബോണ്ടുകളും കോർപ്പറേറ്റ് കടപ്പത്രങ്ങളും ബാങ്ക് എഫ്.ഡിയും (FD) 100% പലിശ (Riba) അധിഷ്ഠിതമായതിനാൽ ശരീഅത്ത് പ്രകാരം നിഷിദ്ധമാണ്.")
-        st.success("✅ **പലിശയില്ലാതെ സ്ഥിരവരുമാനവും സുരക്ഷയും നേടാനുള്ള 4 ഹലാൽ ബദൽ മാർഗ്ഗങ്ങൾ (Halal Fixed-Income Alternatives):**")
-        halal_income = [
-            {"ഹലാൽ മാർഗ്ഗം (Instrument)": "1. ഉയർന്ന ഡിവിഡന്റ് നൽകുന്ന കടരഹിത ഹലാൽ ഓഹരികൾ (High-Dividend Halal Stocks)", "പ്രതീക്ഷിക്കുന്ന വരുമാനം": "2.5% - 4.5% Div + വളർച്ച", "എങ്ങനെ പ്രവർത്തിക്കുന്നു?": "പലിശയ്ക്ക് പകരം കമ്പനിയുടെ യഥാർത്ഥ ലാഭവിഹിതം (Dividend) വർഷാവർഷം ബാങ്ക് അക്കൗണ്ടിലേക്ക് ലഭിക്കുന്നു (ഉദാ: TCS, HCLTECH, INFOSYS)."},
-            {"ഹലാൽ മാർഗ്ഗം (Instrument)": "2. വാടക വരുമാനം നൽകുന്ന റിയൽ എസ്റ്റേറ്റ് / കമേഴ്സ്യൽ ഷോപ്പുകൾ (Ijarah / Rental Yield)", "പ്രതീക്ഷിക്കുന്ന വരുമാനം": "6% - 9% വാർഷിക വാടക", "എങ്ങനെ പ്രവർത്തിക്കുന്നു?": "യഥാർത്ഥ ഭൂമിയിലോ കെട്ടിടങ്ങളിലോ നിക്ഷേപിച്ച് പലിശരഹിതമായി മാസവാടക കൈപ്പറ്റുന്ന രീതി."},
-            {"ഹലാൽ മാർഗ്ഗം (Instrument)": "3. ഫിസിക്കൽ ഗോൾഡ് ഇ.ടി.എഫ് (GOLDBEES - AAOIFI #57)", "പ്രതീക്ഷിക്കുന്ന വരുമാനം": "11% - 14% വാർഷിക വളർച്ച", "എങ്ങനെ പ്രവർത്തിക്കുന്നു?": "പണപ്പെരുപ്പത്തെ തോൽപ്പിക്കാൻ പലിശ ബാങ്കിൽ ഇടുന്നതിന് പകരം 24K ഫിസിക്കൽ സ്വർണ്ണമായി സൂക്ഷിക്കാം, ആവശ്യമുള്ളപ്പോൾ 1 മിനിറ്റിൽ വിറ്റ് പണമാക്കാം."},
-            {"ഹലാൽ മാർഗ്ഗം (Instrument)": "4. സുക്കൂക്ക് / ഇസ്‌ലാമിക് അസറ്റ് ലീസിംഗ് (Sukuk / Equipment Leasing)", "പ്രതീക്ഷിക്കുന്ന വരുമാനം": "8% - 11% ലാഭവിഹിതം", "എങ്ങനെ പ്രവർത്തിക്കുന്നു?": "വ്യവസായ സ്ഥാപനങ്ങൾക്ക് യന്ത്രസാമഗ്രികൾ വാങ്ങി വാടകയ്ക്ക് നൽകി അതിന്റെ വാടക പങ്കിട്ടെടുക്കുന്ന രീതി."}
-        ]
-        st.dataframe(pd.DataFrame(halal_income), use_container_width=True, hide_index=True)
-    else:
-        st.info("💡 **കൺവെൻഷണൽ ബോണ്ട് നിക്ഷേപകർ ശ്രദ്ധിക്കാൻ:** ഉയർന്ന പലിശ വാഗ്ദാനം ചെയ്യുന്ന (12%–15%) ബി-ഗ്രേഡ് കമ്പനികളുടെ ബോണ്ടുകൾ വാങ്ങിയാൽ കമ്പനി പൂട്ടിപ്പോകുമ്പോൾ മുതലും നഷ്ടപ്പെടും! എപ്പോഴും **Sovereign (RBI)** അല്ലെങ്കിൽ **AAA Rated** ബോണ്ടുകൾ മാത്രം തിരഞ്ഞെടുക്കുക.")
-        bonds_list = [
-            {"Bond / Instrument": "1. RBI Retail Direct G-Secs (സർക്കാർ കടപ്പത്രങ്ങൾ)", "Safety Rating": "🛡️ 100% Sovereign Guarantee", "Yield / Return": "7.0% - 7.3% p.a.", "How to Buy": "RBI Retail Direct അല്ലെങ്കിൽ Zerodha Coin / Upstox വഴി ₹10,000 മുതൽ വാങ്ങാം."},
-            {"Bond / Instrument": "2. RBI Treasury Bills (91 / 182 / 364 Days T-Bills)", "Safety Rating": "🛡️ 100% Sovereign Guarantee", "Yield / Return": "6.8% - 7.0% p.a.", "How to Buy": "1 വർഷത്തിൽ താഴെ പണം സുരക്ഷിതമായി സൂക്ഷിക്കാൻ ബാങ്ക് FD-യേക്കാൾ മികച്ചത്."},
-            {"Bond / Instrument": "3. AAA-Rated PSU Corporate Bonds (NHAI, REC, PFC, IRFC)", "Safety Rating": "✅ AAA (Highest Safety)", "Yield / Return": "7.5% - 8.2% p.a.", "How to Buy": "സർക്കാർ പൊതുമേഖലാ സ്ഥാപനങ്ങളുടെ സുരക്ഷിത ബോണ്ടുകൾ."},
-            {"Bond / Instrument": "4. Bharat Bond ETF (Edelweiss)", "Safety Rating": "✅ AAA PSU Basket", "Yield / Return": "7.2% - 7.6% p.a.", "How to Buy": "സ്റ്റോക്ക് പോലെ എപ്പോൾ വേണമെങ്കിലും വാങ്ങാനും വിൽക്കാനും കഴിയുന്ന ബോണ്ട് ETF."}
-        ]
-        st.dataframe(pd.DataFrame(bonds_list), use_container_width=True, hide_index=True)
-
-# ##################################################################
-# 📈 MODULE 7: MUTUAL FUNDS & ETFS
+# 🌍 MODULE 7: GLOBAL MARKETS (US LIVE AUTO-SEARCH & SCREENER)
 # ##################################################################
 elif main_menu == MENU_ITEMS[7]:
-    st.title(MENU_ITEMS[7])
-    if is_shariah:
-        funds = [
-            {"Fund": "Tata Ethical Fund (Direct Growth)", "Type": "Shariah Equity", "3Y CAGR": "20.8%", "5Y CAGR": "22.5%", "Expense": "0.85%", "തിരഞ്ഞെടുക്കാൻ കാരണം": "Nifty 500 Shariah ബെഞ്ച്മാർക്ക്, ബാങ്കിംഗ് ഓഹരികളില്ല, 28+ വർഷത്തെ മികച്ച ചരിത്രം."},
-            {"Fund": "Taurus Ethical Fund (Direct Growth)", "Type": "Shariah Equity", "3Y CAGR": "22.1%", "5Y CAGR": "21.2%", "Expense": "0.95%", "തിരഞ്ഞെടുക്കാൻ കാരണം": "കർശനമായ AAOIFI സ്ക്രീനിംഗ്, മികച്ച മിഡ്-ക്യാപ് വളർച്ച."},
-            {"Fund": "Nippon India Gold BeES", "Type": "Physical Gold ETF", "3Y CAGR": "16.4%", "5Y CAGR": "14.8%", "Expense": "0.55%", "തിരഞ്ഞെടുക്കാൻ കാരണം": "99.5% ശുദ്ധമായ ഫിസിക്കൽ സ്വർണ്ണ പിന്തുണ (AAOIFI Standard #57)."}
-        ]
-    else:
-        funds = [
-            {"Fund": "Parag Parikh Flexi Cap Fund", "Type": "Flexi Cap", "3Y CAGR": "21.5%", "5Y CAGR": "24.2%", "Expense": "0.62%", "തിരഞ്ഞെടുക്കാൻ കാരണം": "വാല്യൂ ഇൻവെസ്റ്റിംഗ്, യു.എസ് ടെക് കമ്പനികളിലെ നിക്ഷേപം."},
-            {"Fund": "UTI Nifty 50 Index Fund", "Type": "Passive Index", "3Y CAGR": "15.8%", "5Y CAGR": "16.5%", "Expense": "0.18%", "തിരഞ്ഞെടുക്കാൻ കാരണം": "ഏറ്റവും കുറഞ്ഞ ചെലവ് (0.18%), ഇന്ത്യയിലെ മികച്ച 50 കമ്പനികൾ."},
-            {"Fund": "Quant Small Cap Fund", "Type": "Small Cap", "3Y CAGR": "34.2%", "5Y CAGR": "38.5%", "Expense": "0.77%", "തിരഞ്ഞെടുക്കാൻ കാരണം": "ഉയർന്ന ദീർഘകാല വളർച്ചയ്ക്ക്."}
-        ]
-    st.dataframe(pd.DataFrame(funds), use_container_width=True, hide_index=True)
+    st.title("🌍 ആഗോള വിപണികൾ — ഏത് യു.എസ് (US) കമ്പനിയും തിരയാം & പോർട്ട്ഫോളിയോ ട്രാക്ക് ചെയ്യാം")
+    u_sym = render_universal_stock_search("us_univ", market_filter="US", default_query="Nvidia")
 
-# ##################################################################
-# 🌍 MODULE 8: GLOBAL MARKETS (INDMONEY / VESTED WITH AUTO-COMPLETE)
-# ##################################################################
-elif main_menu == MENU_ITEMS[8]:
-    st.title(MENU_ITEMS[8])
-    uc1, uc2, uc3, uc4 = st.columns([2, 1, 1, 1])
-    with uc1:
-        u_sym = select_stock_autocomplete("US സ്റ്റോക്ക് തിരഞ്ഞെടുക്കുക (Type to Search):", US_STOCK_DIRECTORY, key_prefix="us_port", default_index=0)
-    u_qty = uc2.number_input("എണ്ണം (Fractional Qty):", value=1.0, min_value=0.01, step=0.1)
-    u_bp = uc3.number_input("വാങ്ങിയ വില ($ USD):", value=100.0, min_value=1.0, step=5.0)
-    u_plat = uc4.selectbox("പ്ലാറ്റ്‌ഫോം:", ["INDmoney", "Vested", "Alpaca API", "Interactive Brokers"])
+    if u_sym:
+        with st.spinner(f"⏳ യു.എസ് കമ്പനി `{u_sym}` പരിശോധിക്കുന്നു..."):
+            us_audit = analyze_any_stock_deep(u_sym)
+            if us_audit:
+                st.info(f"🇺🇸 **{us_audit['name']} (`{us_audit['symbol']}`)** | Live Price: **${us_audit['price']:,.2f}** | ROE: `{us_audit['roe']:.1f}%` | Debt/MCap: `{us_audit['debt_to_mcap']:.1f}%` | Shariah: `{'✅ Halal' if us_audit['shariah_pass'] else '❌ Non-Halal'}` | **{us_audit['verdict']}**")
 
-    if st.button("➕ US പോർട്ട്ഫോളിയോയിലേക്ക് ചേർക്കുക", type="primary"):
-        if u_sym:
-            conn = get_db_connection()
-            conn.execute("INSERT INTO us_portfolio (user_hash, symbol, qty, buy_price_usd, buy_usd_inr, platform) VALUES (?, ?, ?, ?, ?, ?)",
-                         (USER_HASH, u_sym, u_qty, u_bp, 84.0, u_plat))
-            conn.commit()
-            conn.close()
-            st.success(f"✅ {u_sym} saved!")
-            st.rerun()
+    uc1, uc2, uc3 = st.columns(3)
+    u_qty = uc1.number_input("വാങ്ങിയ എണ്ണം (Fractional Qty):", value=1.0, min_value=0.01, step=0.1)
+    u_bp = uc2.number_input("വാങ്ങിയ വില ($ USD):", value=100.0, min_value=1.0, step=5.0)
+    u_plat = uc3.selectbox("US ആപ്പ് / ബ്രോക്കർ:", ["INDmoney", "Vested", "Alpaca API", "Interactive Brokers"])
+
+    if st.button("➕ എന്റെ US പോർട്ട്ഫോളിയോയിലേക്ക് ചേർക്കുക", type="primary"):
+        conn = get_db_connection()
+        conn.execute("INSERT INTO us_portfolio (user_hash, symbol, qty, buy_price_usd, buy_usd_inr, platform) VALUES (?, ?, ?, ?, ?, ?)",
+                     (USER_HASH, u_sym, u_qty, u_bp, 84.5, u_plat))
+        conn.commit()
+        conn.close()
+        st.success(f"✅ {u_sym} ചേർത്തു!")
 
     conn = get_db_connection()
     df_us = pd.read_sql_query("SELECT symbol, qty, buy_price_usd, platform FROM us_portfolio WHERE user_hash=? ORDER BY id DESC", conn, params=(USER_HASH,))
@@ -822,31 +868,42 @@ elif main_menu == MENU_ITEMS[8]:
         st.dataframe(df_us, use_container_width=True, hide_index=True)
 
 # ##################################################################
+# 📜 MODULE 8: BONDS, G-SECS & HALAL FIXED-INCOME
+# ##################################################################
+elif main_menu == MENU_ITEMS[8]:
+    st.title(MENU_ITEMS[8])
+    if is_shariah:
+        st.error("🌙 **ശരീഅത്ത് നിയമം:** സാധാരണ ബോണ്ടുകളും ബാങ്ക് FD-യും പലിശ (Riba) ആയതിനാൽ ഹലാൽ അല്ല. പകരം താഴെ കാണുന്ന പലിശരഹിത മാർഗ്ഗങ്ങൾ തിരഞ്ഞെടുക്കുക:")
+        st.dataframe(pd.DataFrame([
+            {"ഹലാൽ മാർഗ്ഗം": "1. ഉയർന്ന ഡിവിഡന്റ് നൽകുന്ന കടരഹിത ഹലാൽ ഓഹരികൾ (TCS, INFOSYS, HCLTECH)", "വരുമാനം": "2.5% - 4.5% Div + വളർച്ച"},
+            {"ഹലാൽ മാർഗ്ഗം": "2. ഫിസിക്കൽ ഗോൾഡ് & സിൽവർ ഇ.ടി.എഫ് (GOLDBEES / SILVERBEES)", "വരുമാനം": "12% - 14% വാർഷിക വളർച്ച"},
+            {"ഹലാൽ മാർഗ്ഗം": "3. വാടക വരുമാനം നൽകുന്ന റിയൽ എസ്റ്റേറ്റ് / സുക്കൂക്ക് (Ijarah / Sukuk)", "വരുമാനം": "6% - 9% വാടക വരുമാനം"}
+        ]), use_container_width=True, hide_index=True)
+    else:
+        st.dataframe(pd.DataFrame([
+            {"Bond": "1. RBI Retail Direct G-Secs (സർക്കാർ കടപ്പത്രങ്ങൾ)", "Safety": "100% Sovereign Guarantee", "Yield": "7.0% - 7.3% p.a."},
+            {"Bond": "2. RBI 91/364 Day Treasury Bills (T-Bills)", "Safety": "100% Sovereign Guarantee", "Yield": "6.8% - 7.0% p.a."},
+            {"Bond": "3. Bharat Bond ETF / AAA PSU Bonds (NHAI, REC)", "Safety": "AAA Highest Safety", "Yield": "7.4% - 8.0% p.a."}
+        ]), use_container_width=True, hide_index=True)
+
+# ##################################################################
 # 🥇 MODULE 9: GOLD & CRISIS HEDGE ASSETS
 # ##################################################################
 elif main_menu == MENU_ITEMS[9]:
     st.title(MENU_ITEMS[9])
-    gold_data = [
-        {"Instrument": "Nippon India Gold BeES (GOLDBEES)", "Backing": "99.5% Physical Bullion", "Expense": "0.55%", "Compliance": "✅ AAOIFI Standard #57", "തിരഞ്ഞെടുക്കാൻ കാരണം": "NSE-ൽ ഏറ്റവും ഉയർന്ന വോളിയം, 100% ഫിസിക്കൽ ഗോൾഡ് പിന്തുണ."},
-        {"Instrument": "HDFC Gold ETF (HDFCGOLD)", "Backing": "99.5% Physical Bullion", "Expense": "0.30%", "Compliance": "✅ AAOIFI Standard #57", "തിരഞ്ഞെടുക്കാൻ കാരണം": "ദീർഘകാല നിക്ഷേപത്തിന് ഏറ്റവും കുറഞ്ഞ ചെലവ് (0.30%)."},
-        {"Instrument": "Nippon India Silver ETF (SILVERBEES)", "Backing": "99.9% Physical Silver", "Expense": "0.50%", "Compliance": "✅ AAOIFI Standard #57", "തിരഞ്ഞെടുക്കാൻ കാരണം": "ഇലക്ട്രിക് വാഹന/സോളാർ വ്യവസായ ആവശ്യകതയും സുരക്ഷിത നിക്ഷേപവും."}
-    ]
-    st.dataframe(pd.DataFrame(gold_data), use_container_width=True, hide_index=True)
+    st.dataframe(pd.DataFrame([
+        {"Instrument": "Nippon India Gold BeES (GOLDBEES)", "Backing": "99.5% Physical Bullion", "Expense": "0.55%", "Compliance": "✅ AAOIFI Standard #57"},
+        {"Instrument": "HDFC Gold ETF (HDFCGOLD)", "Backing": "99.5% Physical Bullion", "Expense": "0.30%", "Compliance": "✅ AAOIFI Standard #57"},
+        {"Instrument": "Nippon India Silver ETF (SILVERBEES)", "Backing": "99.9% Physical Silver", "Expense": "0.50%", "Compliance": "✅ AAOIFI Standard #57"}
+    ]), use_container_width=True, hide_index=True)
 
 # ##################################################################
-# ⚡ MODULE 10: INTRADAY ALGO TRADING BOT
+# ⚡ MODULE 10: INTRADAY ALGO TRADING BOT (FULL ENGINE RESTORED)
 # ##################################################################
 elif main_menu == MENU_ITEMS[10]:
     st.title("⚡ മൾട്ടി-ബ്രോക്കർ ഇൻസ്റ്റിറ്റ്യൂഷണൽ ഇൻട്രാഡേ ബോട്ട്")
-    with st.expander("📐 ബോട്ട് എങ്ങനെയാണ് ട്രേഡ് തിരഞ്ഞെടുക്കുന്നത്? (6-ഇന മാനദണ്ഡങ്ങൾ)", expanded=False):
-        st.markdown("""
-        1. **നിഫ്റ്റി 50 ട്രെൻഡ് ഗാർഡ്:** `Nifty Price >= 20 EMA` (1-min)
-        2. **VWAP ഫിൽട്ടർ:** `Stock Price > Intraday VWAP`
-        3. **EMA മൊമെന്റം ക്രോസ്:** `EMA 9 crosses above EMA 21`
-        4. **വോളിയം സർജ്:** `Volume >= 1.2x (20-period SMA)`
-        5. **RSI സുരക്ഷാ പരിധി:** `50 <= RSI (14) <= 68`
-        6. **ATR സ്റ്റോപ്പ്-ലോസ് & 3:15 PM എക്സിറ്റ്:** `SL = 1.5x ATR` / `Target = 3.0x ATR`
-        """)
+    with st.expander("📐 ബോട്ട് എങ്ങനെയാണ് ട്രേഡ് തിരഞ്ഞെടുക്കുന്നത്? (6-ഇന മാനദണ്ഡങ്ങൾ)"):
+        st.markdown("1. **Nifty 50 >= 20 EMA** | 2. **Price > VWAP** | 3. **EMA 9 > EMA 21 Cross** | 4. **Volume >= 1.2x SMA** | 5. **RSI 50–68** | 6. **ATR 1:2 Risk-Reward & 3:15 PM Auto Exit**.")
 
     selected_broker = st.selectbox("🏦 ബ്രോക്കർ തിരഞ്ഞെടുക്കുക:", ["Upstox (API v2)", "Dhan (DhanHQ API)", "Zerodha (Kite Connect)", "Angel One (SmartAPI)"])
     state['broker'] = selected_broker.split(" ")[0]
@@ -859,11 +916,9 @@ elif main_menu == MENU_ITEMS[10]:
         api_k = oa1.text_input(f"{state['broker']} API Key:", value=state['api_key'], type="password")
         api_s = oa2.text_input(f"{state['broker']} API Secret:", value=state['api_secret'], type="password")
         red_u = oa3.text_input("Redirect URL:", value=state['redirect_uri'])
-
         if api_k != state['api_key'] or api_s != state['api_secret'] or red_u != state['redirect_uri']:
             state['api_key'], state['api_secret'], state['redirect_uri'] = api_k.strip(), api_s.strip(), red_u.strip()
             save_user_creds(USER_HASH, state['api_key'], state['api_secret'], state['redirect_uri'], state['tg_token'], state['tg_chat'], state['token'], state['broker'])
-
         if state['broker'] == "Upstox" and state['api_key'] and state['api_secret'] and state['redirect_uri']:
             encoded_redir = urllib.parse.quote(state['redirect_uri'], safe='')
             auth_url = f"https://api.upstox.com/v2/login/authorization/dialog?response_type=code&client_id={state['api_key']}&redirect_uri={encoded_redir}&state={USER_HASH}"
@@ -904,27 +959,25 @@ elif main_menu == MENU_ITEMS[10]:
     m4.metric("ക്യാപിറ്റൽ", f"₹{state['capital']:,.2f}")
 
 # ##################################################################
-# 📚 MODULE 11: INVESTMENT AUDIT JOURNAL (WITH AUTO-COMPLETE)
+# 📚 MODULE 11: INVESTMENT AUDIT JOURNAL
 # ##################################################################
 elif main_menu == MENU_ITEMS[11]:
     st.title(MENU_ITEMS[11])
-    with st.expander("➕ പുതിയ നിക്ഷേപ തീരുമാനം രേഖപ്പെടുത്തുക", expanded=True):
-        j_col1, j_col2, j_col3 = st.columns([2, 1, 1])
-        with j_col1:
-            j_asset = select_stock_autocomplete("സ്റ്റോക്ക് / അസറ്റ് തിരഞ്ഞെടുക്കുക:", NSE_STOCK_DIRECTORY, key_prefix="journal_sel", default_index=0)
-        j_action = j_col2.selectbox("തീരുമാനം:", ["BUY (വാങ്ങി)", "HOLD (തുടരുന്നു)", "SELL (വിറ്റു)", "WATCHLIST"])
-        j_status = j_col3.selectbox("വിഭാഗം:", ["✅ Long-Term Moat", "🌙 Halal Verified", "⚠️ Tactical Bet", "🛑 Rule Exit"])
-        j_reason = st.text_area("എന്തുകൊണ്ട് ഈ തീരുമാനം എടുത്തു? (Thesis & Exit Rule):")
+    j_asset = render_universal_stock_search("journ_univ", market_filter="ALL", default_query="TCS")
+    j_col1, j_col2 = st.columns(2)
+    j_action = j_col1.selectbox("തീരുമാനം:", ["BUY (വാങ്ങി)", "HOLD (തുടരുന്നു)", "SELL (വിറ്റു)", "WATCHLIST"])
+    j_status = j_col2.selectbox("വിഭാഗം:", ["✅ Long-Term Moat", "🌙 Halal Verified", "⚠️ Tactical Bet", "🛑 Rule Exit"])
+    j_reason = st.text_area("എന്തുകൊണ്ട് ഈ തീരുമാനം എടുത്തു? (Thesis & Exit Rule):")
 
-        if st.button("💾 ജേർണലിൽ സേവ് ചെയ്യുക", type="primary"):
-            if j_asset and j_reason:
-                conn = get_db_connection()
-                conn.execute("INSERT INTO wealth_audit (user_hash, date, asset, category, action, status, veteran_reason) VALUES (?, ?, ?, ?, ?, ?, ?)",
-                             (USER_HASH, datetime.date.today().strftime("%Y-%m-%d"), j_asset, "Equity/Asset", j_action, j_status, j_reason))
-                conn.commit()
-                conn.close()
-                st.success("✅ സേവ് ചെയ്തു!")
-                st.rerun()
+    if st.button("💾 ജേർണലിൽ സേവ് ചെയ്യുക", type="primary"):
+        if j_asset and j_reason:
+            conn = get_db_connection()
+            conn.execute("INSERT INTO wealth_audit (user_hash, date, asset, category, action, status, veteran_reason) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                         (USER_HASH, datetime.date.today().strftime("%Y-%m-%d"), j_asset, "Equity/Asset", j_action, j_status, j_reason))
+            conn.commit()
+            conn.close()
+            st.success("✅ സേവ് ചെയ്തു!")
+            st.rerun()
 
     conn = get_db_connection()
     df_audit = pd.read_sql_query("SELECT date AS Date, asset AS Asset, action AS Action, status AS Classification, veteran_reason AS [Thesis / Notes] FROM wealth_audit WHERE user_hash=? ORDER BY id DESC LIMIT 50", conn, params=(USER_HASH,))
